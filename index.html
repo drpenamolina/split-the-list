@@ -1,0 +1,1645 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Split patients</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#fff; --ink:#1c2230; --muted:#6b7385; --line:#e2e5eb;
+  --accent:#2f6fde; --accent-soft:#e8f0fd; --warn:#c2410c; --warn-soft:#fff3e8;
+  --ok:#15803d; --danger:#b91c1c; --danger-soft:#fdecec;
+  --new:#7c3aed; --dc:#0e7490; --cx:#b91c1c;
+  --shadow:0 1px 2px rgba(20,30,50,.06),0 2px 8px rgba(20,30,50,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#12151b;--panel:#1b2029;--ink:#e6e9ef;--muted:#99a1b3;--line:#2c3340;
+  --accent:#6b9bf0;--accent-soft:#1f2b40;--warn:#fb923c;--warn-soft:#3a2716;
+  --danger:#f87171;--danger-soft:#3a1d1d;--new:#a78bfa;--dc:#22d3ee;--cx:#f87171;
+  --shadow:0 1px 2px rgba(0,0,0,.3)}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header h1{font-size:17px;margin:0 auto 0 0}
+header a.back{font-size:13px;color:var(--accent);text-decoration:none}
+button{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;border-radius:8px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.ghost{border-color:transparent;background:transparent;padding:4px 6px;color:var(--muted)}
+button.ghost:hover{color:var(--ink)}
+#layout{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 8px;border-radius:8px}
+.toggle{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;user-select:none}
+main{padding:16px;max-width:1400px;margin:0 auto}
+.input-panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px;box-shadow:var(--shadow)}
+.input-panel textarea{width:100%;min-height:150px;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:10px;font:13px/1.45 ui-monospace,Menlo,monospace;background:var(--bg);color:var(--ink)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.hint{color:var(--muted);font-size:12.5px}
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;align-items:start}
+.col{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:140px;transition:border-color .12s,background .12s}
+.col.over{border-color:var(--accent);background:var(--accent-soft)}
+.col.pool{border-style:dashed}
+.col-head{padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.col-title{display:flex;align-items:center;gap:6px}
+.col-title .rtog{padding:2px 5px;font-size:12px;white-space:nowrap;color:var(--ok)}
+.col-title .rtog.off{color:var(--muted);opacity:.6}
+.col-title .metog{padding:2px 5px;font-size:12px;white-space:nowrap;color:var(--muted)}
+.col-title .metog.on{color:var(--accent);font-weight:600}
+.mb{font-size:12px;line-height:1.45;padding:7px 12px;border-bottom:1px solid var(--line);background:var(--accent-soft)}
+.mb.warn{background:var(--warn-soft)}
+.mb .w{color:var(--warn);font-weight:600}
+.mb .ok{color:var(--ok);font-weight:600}
+.mb button{font-size:12px;padding:3px 8px;margin-top:3px}
+.col-title input{flex:1;min-width:0;font-family:inherit;font-weight:600;font-size:15px;line-height:1.2;border:1px solid transparent;background:transparent;color:var(--ink);border-radius:6px;padding:3px 4px}
+.col-title input:hover,.col-title input:focus{border-color:var(--line);outline:none}
+.col-title .pool-name{font-weight:600;font-size:15px;padding:3px 4px;flex:1}
+.count{font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
+.count.over{color:var(--danger)}
+.stats{display:flex;gap:10px;font-size:12px;color:var(--muted);margin-top:4px;padding-left:4px}
+.stats b{font-weight:600}
+.cards{padding:8px;display:flex;flex-direction:column;gap:6px;flex:1;min-height:60px}
+.empty{color:var(--muted);font-size:12.5px;text-align:center;padding:14px 4px}
+.card{position:relative;display:flex;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--floor,var(--line));border-radius:8px;padding:8px 8px 8px 10px;cursor:grab;user-select:none;-webkit-user-select:none}
+.card:hover{border-color:var(--accent);border-left-color:var(--floor,var(--accent))}
+.card.selected{outline:2px solid var(--accent);outline-offset:1px}
+.card.needs{background:var(--warn-soft)}
+.card .bed{font:700 20px/1 ui-monospace,Menlo,monospace;min-width:62px;letter-spacing:-.5px}
+.card .who{flex:1;min-width:0}
+.card .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .unit{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.card .prev{font-size:11px;font-weight:600;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.card .meta{font-size:12px;color:var(--muted);display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-top:2px}
+.tag{font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:99px;border:1px solid currentColor;cursor:pointer;opacity:.35;background:transparent;line-height:1.5}
+.tag.on{opacity:1}
+.pcb{font-size:11px;cursor:help}
+.tag.n{color:var(--new)} .tag.d{color:var(--dc)} .tag.c{color:var(--cx)}
+.card .actions{display:flex;flex-direction:column;gap:0}
+.handle{touch-action:none;cursor:grab;color:var(--muted);font-size:16px;padding:4px 2px;line-height:1}
+.ghostcard{position:fixed;pointer-events:none;z-index:100;opacity:.9;transform:rotate(2deg);box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:200}
+.toast.show{opacity:1}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);padding:16px;width:min(360px,92vw)}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+dialog input{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:7px;font:inherit;background:var(--bg);color:var(--ink)}
+.settings{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.settings input[type=number]{width:52px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+.pickcol{margin-top:8px;padding:10px;border:1px solid var(--warn);background:var(--warn-soft);border-radius:8px;color:var(--ink)}
+.pickcol button{margin:6px 6px 0 0;font:12.5px ui-monospace,Menlo,monospace;padding:5px 9px}
+#printArea{display:none}
+@media (max-width:600px){
+  .card{cursor:default}
+  header h1{width:100%}
+  header{position:static}
+}
+@media print{
+  header,.input-panel,.board,.toast,dialog{display:none!important}
+  body{background:#fff;color:#000}
+  #printArea{display:block;font-size:12pt}
+  #printArea section{page-break-inside:avoid;margin-bottom:18pt}
+  #printArea h2{font-size:15pt;border-bottom:1.5pt solid #000;margin:0 0 6pt}
+  #printArea table{width:100%;border-collapse:collapse}
+  #printArea td{border-bottom:.5pt solid #999;padding:5pt 4pt;vertical-align:top}
+  #printArea td.b{font-weight:700;font-family:Menlo,monospace;width:70pt}
+  #printArea td.notes{width:45%}
+  #printArea td.seen{width:20pt;padding-left:0;padding-right:0}
+  #printArea .box{display:inline-block;width:11pt;height:11pt;border:1.2pt solid #000;vertical-align:-2pt}
+}
+</style>
+<!-- Shared by Print.html (Rounds sheet) and Split.html, which include it with a
+     printing scriptlet that calls HtmlService.createHtmlOutputFromFile('Rounds').
+     Holds the printed rounds cards and the team-census PDF reader (PDF.js, runs in the
+     browser; the PDF is never uploaded). Every class is prefixed rp- so it cannot clash
+     with the page that includes it. -->
+<style>
+#rp{display:none}
+@page{size:letter portrait;margin:0.35in}
+@media print{
+  body.rp-on{background:#fff!important}
+  body.rp-on > *:not(#rp){display:none!important}
+  body.rp-on #rp{display:block}
+}
+#rp{font-family:Arial,Helvetica,sans-serif;color:#111;background:#fff}
+#rp *{box-sizing:border-box}
+.rp-page{height:10.25in;display:flex;flex-direction:column;break-after:page;page-break-after:always;font-size:8.5pt}
+.rp-page:last-child{break-after:auto;page-break-after:auto}
+.rp-top{display:flex;justify-content:space-between;align-items:baseline;font-size:9pt;border-bottom:1.5px solid #111;padding-bottom:3px;margin-bottom:5px;height:22px}
+.rp-card{flex:1 1 0;border:1.4px solid #111;border-radius:4px;margin-bottom:6px;display:flex;flex-direction:column;overflow:hidden;break-inside:avoid}
+.rp-card:last-child{margin-bottom:0}
+/* position marks: same tone and number on the front and back of each card, so a flipped
+   sheet cannot be matched to the wrong patient */
+.rp-card.rp-p1{border-left:7px solid #111;border-right:7px solid #111}
+.rp-card.rp-p2{border-left:7px solid #666;border-right:7px solid #666}
+.rp-card.rp-p3{border-left:7px solid #bbb;border-right:7px solid #bbb}
+.rp-card.rp-p4{border-left:7px dashed #111;border-right:7px dashed #111}
+.rp-pos{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#111;color:#fff;font-weight:bold;font-size:10pt;flex:0 0 auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rp-card .rp-hd .rp-room{font-size:14pt;padding:0 7px}
+.rp-hd{display:flex;align-items:center;gap:8px;background:#e9e9e9;border-bottom:1px solid #111;padding:4px 7px;min-height:26px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rp-room{background:#111;color:#fff;font-weight:bold;font-size:11pt;padding:1px 6px;border-radius:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rp-room.rp-blank{background:#fff;color:#111;border:1px solid #111;min-width:50px}
+.rp-nm{font-weight:bold;font-size:11pt}.rp-as{font-weight:bold}
+.rp-meta{font-size:7.5pt;color:#333}
+.rp-flag{font-size:7pt;font-weight:bold;border:1.2px solid #111;padding:0 4px;border-radius:2px;background:#fff}
+.rp-chk{margin-left:auto;display:flex;align-items:center;gap:3px;font-size:8pt}
+.rp-dx{padding:2px 7px;font-size:8pt;border-bottom:1px solid #bbb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-cols{flex:1;display:grid}
+.rp-cols>div{padding:4px 7px;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.rp-cols.rp-f{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,0.9fr)}.rp-cols.rp-b{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.rp-cols.rp-f>div:nth-child(-n+2),.rp-cols.rp-b>div:first-child{border-right:1px solid #bbb}
+.rp-lbl{font-size:7pt;font-weight:bold;letter-spacing:.06em;color:#444;margin-top:4px}
+.rp-ln{border-bottom:1px solid #ccc;height:15px}
+.rp-pl{border-bottom:1px solid #ccc;height:15px;font-size:7.5pt;color:#555;padding-top:3px}
+.rp-s,.rp-vs{font-size:8pt}
+.rp-vt{color:#555;font-size:.85em}
+.rp-bx{display:inline-block;width:9px;height:9px;border:1.1px solid #111;vertical-align:-1px;margin:0 2px 0 4px;background:#fff}
+.rp-fbs{display:flex;gap:10px;margin:2px 0}
+.rp-fb{height:62px;stroke:#111;stroke-width:1.6;fill:none;overflow:visible}
+.rp-fb .rp-fv{fill:#111;stroke:none;font:10px Arial,Helvetica,sans-serif;text-anchor:middle}
+.rp-fb .rp-fv.rp-ab{font-weight:bold}
+.rp-src{font-size:6.5pt;color:#555}
+.rp-ol{font-size:7.5pt;line-height:1.25;margin-top:2px;max-height:3.9em;overflow:hidden}
+.rp-kv{font-size:8pt;margin-top:4px}
+.rp-td{display:flex;align-items:flex-end;height:15px}
+.rp-td .rp-bx{margin:0 4px 1px 0}
+.rp-ln2{flex:1;border-bottom:1px solid #ccc}
+/* landscape: 3 patients per sheet, columns Demographics | PMHx | Dx | Labs | Images | Pending */
+.rp-page.rp-w{height:7.75in}
+.rp-wrow{flex:1 1 0;display:grid;grid-template-rows:minmax(0,1fr);overflow:hidden;grid-template-columns:1.45fr 1.05fr 1.15fr 2.75fr 1.3fr 1.5fr;border:1.4px solid #111;border-bottom:none;break-inside:avoid;min-height:0}
+.rp-wrow:last-child{border-bottom:1.4px solid #111}
+.rp-wrow>div{border-right:1px solid #111;padding:3px 5px;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.rp-wrow>div:last-child{border-right:none}
+.rp-wh{display:grid;grid-template-columns:1.45fr 1.05fr 1.15fr 2.75fr 1.3fr 1.5fr;border:1.4px solid #111;border-bottom:none;background:#e9e9e9;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rp-wh>div{border-right:1px solid #111;text-align:center;font-size:8pt;font-weight:bold;padding:2px}
+.rp-wh>div:last-child{border-right:none}
+.rp-wdem .rp-room{align-self:flex-start;margin-bottom:2px}
+.rp-wdem .rp-nm{font-size:10pt;line-height:1.15}
+.rp-wdem .rp-meta{margin-top:1px}
+.rp-wdem .rp-flag{align-self:flex-start;margin-top:3px}
+.rp-wtop{display:flex;align-items:center;gap:4px;flex:0 0 auto;margin-bottom:2px}
+.rp-wtop .rp-room{margin:0;white-space:nowrap;flex:0 0 auto;font-size:10pt}
+.rp-wtop .rp-chk{margin-left:auto;font-size:7pt;white-space:nowrap;flex:0 1 auto;gap:1px}
+.rp-wtop .rp-chk .rp-bx{margin:0 1px 0 2px}
+.rp-wdxt{flex:1 1 auto;min-height:0;overflow:hidden;font-size:6.5pt;line-height:1.2;color:#444}
+.rp-wkv{flex:0 0 auto;font-size:8pt}
+.rp-wkv>div{display:flex;align-items:flex-end;gap:3px;height:15px}
+.rp-wdx{font-size:8.5pt}
+.rp-wlab .rp-vs{font-size:7.5pt;line-height:1.25}
+.rp-wlab .rp-fb{height:44px}
+.rp-wlab .rp-fbs{gap:6px;margin:1px 0}
+.rp-wlab .rp-ol{font-size:7pt}
+/* AI summary text (Dx / PMH / Meds / Imaging) printed into the blank lines */
+.rp-pl.rp-fl,.rp-ln.rp-fl{color:#111;font-size:7.5pt;padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-ai{font-size:7.5pt;line-height:1.25;color:#111;overflow:hidden}
+.rp-ai>div{border-bottom:1px solid #e3e3e3}
+.rp-wtxt{font-size:7.5pt;line-height:1.2;overflow:hidden;min-height:0}
+.rp-wtxt.rp-grow{flex:1 1 0}
+.rp-wdxl{flex:1 1 auto;min-height:0;overflow:hidden;font-size:8pt;line-height:1.2}
+.rp-wdxl div{margin-bottom:2px}
+.rp-c2{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.rp-c4{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}
+.rp-c1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* AI data loaded from a saved .txt and not refreshed today */
+.rp-old{font-size:6.5pt;font-weight:normal;letter-spacing:0;border:1px solid #777;border-radius:2px;padding:0 2px;margin-left:3px;color:#333}
+/* paste dialog (screen only) */
+#rp-ai{width:min(760px,94vw);max-width:none;border:1px solid #ccc;border-radius:10px;padding:16px;background:#fff;color:#111;font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+#rp-ai::backdrop{background:rgba(0,0,0,.35)}
+#rp-ai h3{margin:0 0 6px;font-size:16px}
+#rp-ai ol{margin:0 0 8px;padding-left:20px;font-size:13px;color:#444}
+#rp-ai textarea{width:100%;height:280px;font:12px/1.4 Consolas,Menlo,monospace;padding:8px;border:1px solid #bbb;border-radius:6px;background:#fff;color:#111}
+#rp-ai .rp-arow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+#rp-ai .rp-amsg{font-size:13px;margin-top:8px}
+#rp-ai .rp-amsg.rp-warn{color:#a40}
+#rp-ai .rp-amsg.rp-ok{color:#176b2c}
+</style>
+<script>
+window.Rounds=(function(){
+"use strict";
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function clean(s){return String(s||"").replace(/\s+/g," ").trim();}
+function titleSex(s){return /^m/i.test(s)?"M":/^f/i.test(s)?"F":"U";}
+function fmtRoom(r){
+  var x=r.replace(/^[A-Z]{1,4}\./i,"");
+  var i=x.lastIndexOf(".");
+  return i>0?x.slice(0,i)+"-"+x.slice(i+1):x;
+}
+function fmtAtt(a){
+  a=clean(a).replace(/\s+(MD|DO|NP|PA|PA-C)$/i,"");
+  var i=a.indexOf(",");
+  return i>0?a.slice(0,i):a;
+}
+
+/* ---------------- census PDF ---------------- */
+var PDFJS="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/",pdfjsReady=null;
+function loadPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return pdfjsReady||(pdfjsReady=new Promise(function(ok,fail){
+    var s=document.createElement("script");s.src=PDFJS+"pdf.min.js";
+    s.onload=function(){window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+"pdf.worker.min.js";ok(window.pdfjsLib);};
+    s.onerror=function(){pdfjsReady=null;fail(new Error("could not load the PDF reader (no internet?)"));};
+    document.head.appendChild(s);
+  }));
+}
+// One string per printed row: "left column<TAB>right column", rebuilt from each word's
+// x/y position so a patient's name, age and room stay together.
+function pageRows(items){
+  var w=items.filter(function(it){return it.str&&it.str.trim();}).map(function(it){return {x:it.transform[4],y:it.transform[5],s:it.str};});
+  if(!w.length) return [];
+  var minX=Math.min.apply(null,w.map(function(a){return a.x;})),colX=minX+60;
+  var rows=[];
+  w.forEach(function(a){
+    var r=null;for(var i=0;i<rows.length;i++) if(Math.abs(rows[i].y-a.y)<=3){r=rows[i];break;}
+    if(r) r.w.push(a); else rows.push({y:a.y,w:[a]});
+  });
+  rows.sort(function(a,b){return b.y-a.y;});
+  return rows.map(function(r){
+    r.w.sort(function(a,b){return a.x-b.x;});
+    var L=[],R=[];r.w.forEach(function(a){(a.x<colX?L:R).push(a.s);});
+    return clean(L.join(" "))+"\t"+clean(R.join(" "));
+  });
+}
+function pdfLines(file){
+  return loadPdfJs().then(function(lib){return file.arrayBuffer().then(function(buf){return lib.getDocument({data:buf}).promise;});})
+  .then(function(pdf){
+    var ps=[];for(var i=1;i<=pdf.numPages;i++) ps.push(pdf.getPage(i).then(function(pg){return pg.getTextContent();}).then(function(tc){return pageRows(tc.items);}));
+    return Promise.all(ps);
+  }).then(function(pages){return [].concat.apply([],pages);});
+}
+function isPdf(f){return !!f&&(/\.pdf$/i.test(f.name)||f.type==="application/pdf");}
+// A long name wraps: "DOE SMITH,  34Y Male" and the first name ("JOHN A") on the next
+// row, so the first name may be empty here and is picked up from the following row.
+var C_PT=/^(.+?,.*?)\s*(\d{1,3})\s?Y\s+(Male|Female|Unknown)\b/i;
+var C_IDS=/^([A-Z]{1,4}\d{6,})\s+([A-Z]{1,4}\d{6,})/;
+var C_BED=/^[A-Z]{1,4}[.:]\d{1,4}[.:][A-Z0-9]{1,3}$/;
+var C_UNIT=/\.([^.()]{2,45}?)\s*\(\d+\)\s*$/;
+var C_SKIP=/^Report created on|Page \d+ of \d+|\(\d+\)\s*$/i;
+// stray marks a PDF can carry next to the text ("JANE |", "~ HYPERKALEMIA")
+function tidyLine(s){return clean(String(s||"").replace(/[|~¦•«»]/g," "));}
+// Length of stay. The census prints "LOS:7.5H" or "LOS:6D" as of when the report was made, so
+// turn it into an admit time and count from there to the moment the sheet is printed.
+function reportTime(text){
+  var m=/Report created on\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)?/i.exec(text||"");if(!m) return null;
+  var h=+m[4];if(m[6]) h=h%12+(/PM/i.test(m[6])?12:0);
+  return new Date(+m[3],+m[1]-1,+m[2],h,+m[5]).getTime();
+}
+function losAdmit(text,rep){
+  var m=/\bLOS:?\s*(\d+(?:\.\d+)?)\s*([HD])\b/i.exec(text||"");if(!m) return null;
+  return (rep||Date.now())-(+m[1])*(/D/i.test(m[2])?24:1)*36e5;
+}
+function losLabel(adm){
+  if(adm==null||isNaN(adm)) return "";
+  var h=Math.max(0,(Date.now()-adm)/36e5);
+  return "LOS "+(h<24?Math.round(h)+"h":Math.floor(h/24)+"d");
+}
+// Team census records: NAME 54Y Female LOS / Attending MD / Account MRN / Payer | Dx (wraps) / VR.218.A | Inpatient
+// Meditech "Rounding List" (PCM → Rounding Patients → print). Per patient:
+//   VR.255-A  Doe,John 51 M VR00000000
+//   Nov 15,26 HYPERTENSIVE EMERGENCY,...      (admit date + Dx, may wrap)
+//   30 Day Readmit / Tele Order Exp / Vac Review   (ignored)
+//   Attending,Name H  MD ...            (attending)
+// under unit headers "General Hospital MC: 2 EAST CARDIAC UNIT (6)".
+var R_PT=/^([A-Z]{1,4})[.:](\d{1,4}[A-Z]?)[-.]([A-Z0-9]{1,3})\s+(.+?,.+?)\s+(\d{1,3})\s+(M|F|U)\b\s*([A-Z]{1,4}\d{6,})?/;
+var R_ADM=/^([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{2})\b\s*(.*)$/;
+var R_UNIT=/:\s*([^:()]{2,45}?)\s*\((\d+)\)\s*$/;
+var R_SKIP=/^(RUN (DATE|TIME|USER)|30 Day Readmit|Tele Order|Vac Review)\b|Rounding (List|Patients)/i;
+function isRounding(lines){
+  var r=0,c=0;
+  lines.forEach(function(ln){var all=tidyLine(ln.replace("\t"," "));if(R_PT.test(all)) r++;if(C_PT.test(all)) c++;});
+  return r>0&&r>=c;
+}
+function parseRounding(lines){
+  var out=[],cur=null,unit="",expected=0,units=0;
+  lines.forEach(function(ln){
+    var all=tidyLine(ln.replace("\t"," ")),m;
+    if((m=R_PT.exec(all))){
+      var nm=m[4].split(","),name=clean(nm[0]).toUpperCase()+", "+clean(nm.slice(1).join(" ")).toUpperCase();
+      cur={room:fmtRoom(m[1]+"."+m[2]+"."+m[3]),name:name,age:m[5],sex:titleSex(m[6]),dob:"",acct:m[7]||"",att:"",dx:"",flag:"",unit:unit,adm:null,_s:0};
+      out.push(cur);return;
+    }
+    if(R_SKIP.test(all)){if(cur&&cur._s<2) cur._s=2;return;}
+    if((m=R_UNIT.exec(all))&&!/\b(MD|DO)\b/.test(all)){unit=clean(m[1]);expected+=+m[2];units++;cur=null;return;}
+    if(!cur) return;
+    if(cur._s===0&&(m=R_ADM.exec(all))&&m[1] in MON){
+      cur.adm=new Date(2000+ +m[3],MON[m[1]],+m[2]).getTime();cur.dx=clean(m[4]);cur._s=1;return;
+    }
+    if(cur._s===1){cur.dx=clean(cur.dx+" "+all);return;}
+    if(cur._s===2&&!cur.att&&(m=/^(.+?,.+?)\s+(MD|DO|NP|PA|PA-C)\b/.exec(all))){cur.att=fmtAtt(m[1]);cur._s=3;}
+  });
+  var bad=0;
+  out.forEach(function(r){if(!r.room){r.flag="CHECK";bad++;}delete r._s;});
+  return {rows:out,bad:bad,expected:units?expected:null};
+}
+function parseCensus(lines){
+  if(isRounding(lines)) return parseRounding(lines);
+  var out=[],cur=null,expected=null,unit="";
+  lines.forEach(function(ln){
+    var c=ln.split("\t"),L=tidyLine(c[0]),R=tidyLine(c[1]),all=clean(L+" "+R);
+    var t=/Team[^()]{0,20}\((\d+)\)/i.exec(all);
+    if(t&&!cur&&!out.length){expected=+t[1];return;}
+    var u=C_UNIT.exec(all);
+    if(u&&!C_PT.test(all)){unit=clean(u[1]);return;}
+    if(C_SKIP.test(all)&&!C_PT.test(all)) return;
+    var m=C_PT.exec(all);
+    if(m){cur={room:"",name:clean(m[1]),age:m[2],sex:titleSex(m[3]),dob:"",acct:"",att:"",dx:"",flag:"",unit:unit,_s:0,_los:all,_wrap:/,$/.test(clean(m[1]))};out.push(cur);return;}
+    if(!cur) return;
+    // wrapped first name: a row of letters only, right after "LAST,"
+    if(cur._wrap){cur._wrap=false;if(/^[A-Za-zÀ-ÿ'’.\- ]+$/.test(all)){cur.name=clean(cur.name+" "+all);return;}}
+    if(cur._s===0){cur.att=fmtAtt(all);cur._s=1;return;}
+    var ids=C_IDS.exec(all);
+    if(cur._s===1&&ids){cur.acct=ids[1];cur._s=2;return;}
+    if(C_BED.test(L)){if(cur._s<3){cur.room=fmtRoom(L.replace(/:/g,"."));if(/observation/i.test(R)) cur.flag="OBS";cur._s=3;}return;}
+    if(cur._s===2&&R) cur.dx=clean(cur.dx+" "+R);
+  });
+  var bad=0,rep=reportTime(lines.join(" "));
+  out.forEach(function(r){if(!r.room||!r.acct){r.flag=r.flag||"CHECK";bad++;}r.adm=losAdmit(r._los,rep);delete r._s;delete r._los;delete r._wrap;});
+  return {rows:out,bad:bad,expected:expected};
+}
+
+/* ---------------- Meditech "24 Hour Data" PDF ----------------
+   Meditech PCM → Clinical Review → Daily Review → "24 Hour" tab → printer icon → save as PDF.
+   One PDF per patient. Read here in the browser; only the labs and vitals summary is kept,
+   in memory, and only until the page is closed. */
+var MON={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+// Rows of {x,s} cells, top to bottom, page after page.
+function pdfRowsXY(file){
+  return loadPdfJs().then(function(lib){return file.arrayBuffer().then(function(buf){return lib.getDocument({data:buf}).promise;});})
+  .then(function(pdf){
+    var ps=[];for(var i=1;i<=pdf.numPages;i++) ps.push(pdf.getPage(i).then(function(pg){return pg.getTextContent();}).then(function(tc){
+      var rows=[];
+      tc.items.forEach(function(it){
+        if(!it.str||!it.str.trim()) return;
+        var a={x:it.transform[4],y:it.transform[5],s:clean(it.str)},r=null;
+        for(var j=0;j<rows.length;j++) if(Math.abs(rows[j].y-a.y)<=2.5){r=rows[j];break;}
+        if(r) r.cells.push(a); else rows.push({y:a.y,cells:[a]});
+      });
+      rows.sort(function(a,b){return b.y-a.y;});
+      rows.forEach(function(r){r.cells.sort(function(a,b){return a.x-b.x;});r.text=r.cells.map(function(c){return c.s;}).join(" ");});
+      return rows;
+    }));
+    return Promise.all(ps);
+  }).then(function(pages){return [].concat.apply([],pages);});
+}
+var V_TIME=/^([A-Z][a-z]{2}) (\d{1,2}) (\d{2}):(\d{2})$/;
+var L_TIME=/([A-Z][a-z]{2}) (\d{1,2}),(\d{2}) (\d{2}):(\d{2})/;
+function num(s){var m=/-?\d+(?:\.\d+)?/.exec(s||"");return m?+m[0]:null;}
+// -> {acct, room, run:Date, vit:[{t,hr,rr,bp,ox}], tUnit, labs:{name:{v,flag,t}}, poc:[{v,t}]} or null
+function parseDaily(rows){
+  var txt=rows.map(function(r){return r.text;}).join("\n");
+  if(!/Vital Signs|Laboratory Test Results/.test(txt)||!/Acct No/i.test(txt)) return null;
+  var pc={acct:"",room:"",run:null,vit:[],tUnit:"F",labs:{},poc:[]},m;
+  if((m=/Acct No:\s*([A-Z]{1,4}\d{6,})/i.exec(txt))) pc.acct=m[1];
+  if((m=/\b[A-Z]{1,4}\.(\d{1,4}[A-Z]?)\/([A-Z0-9]{1,3})\b/.exec(txt))) pc.room=m[1]+"-"+m[2];
+  if((m=/RUN DATE:\s*(\d{1,2})\/(\d{1,2})\/(\d{2})/.exec(txt))) pc.run=new Date(2000+ +m[3],+m[1]-1,+m[2]);
+  var sec=null,vcols=null,lcol={res:240,ref:335};
+  rows.forEach(function(r){
+    var t=r.text;
+    if(/^Vital Signs$/i.test(t)){sec="v";return;}
+    if(/^Laboratory Test Results$/i.test(t)){sec="l";return;}
+    if(/^(Reports|Medications|Microbiology|Imaging|Intake|I \+ O|Orders)\b/i.test(t)&&r.cells.length<=2){sec=null;return;}
+    if(sec==="v"){
+      if(/Temp/i.test(t)&&/Pulse/i.test(t)){
+        vcols=[];
+        r.cells.forEach(function(c){
+          var k=/Ox|SpO|Sat/i.test(c.s)?"ox":/Temp/i.test(c.s)?"t":/Pulse|Heart/i.test(c.s)?"hr":/Resp/i.test(c.s)?"rr":/Pressure|BP/i.test(c.s)?"bp":null;
+          if(k){vcols.push({x:c.x,k:k});if(k==="t"&&/\(C\)/.test(c.s)) pc.tUnit="C";}
+        });
+        return;
+      }
+      if(!vcols||!V_TIME.test(r.cells[0].s)) return;
+      var vm=V_TIME.exec(r.cells[0].s),yr=pc.run?pc.run.getFullYear():new Date().getFullYear();
+      var v={tm:new Date(yr,MON[vm[1]]||0,+vm[2],+vm[3],+vm[4]).getTime()};
+      if(pc.run&&v.tm>pc.run.getTime()+864e5) v.tm=new Date(yr-1,MON[vm[1]]||0,+vm[2],+vm[3],+vm[4]).getTime();
+      r.cells.slice(1).forEach(function(c){
+        var col=null;vcols.forEach(function(vc){if(vc.x<=c.x+4) col=vc;});
+        if(col) v[col.k]=c.s;
+      });
+      pc.vit.push(v);
+    }else if(sec==="l"){
+      if(/^Result\b/.test(r.cells[0].s)||/\bResult\b.*\bReference\b/.test(t)){
+        r.cells.forEach(function(c){if(/^Result/.test(c.s)) lcol.res=c.x-8;if(/^Reference/.test(c.s)) lcol.ref=c.x-8;});
+        return;
+      }
+      var tm=L_TIME.exec(t);if(!tm) return;
+      var name=[],res=[];
+      r.cells.forEach(function(c){if(L_TIME.test(c.s)) return;if(c.x<lcol.res) name.push(c.s);else if(c.x<lcol.ref) res.push(c.s);});
+      name=clean(name.join(" "));res=clean(res.join(" "));
+      if(!name||!res) return;
+      var when=new Date(2000+ +tm[3],MON[tm[1]]||0,+tm[2],+tm[4],+tm[5]).getTime();
+      var fm=/^(.*?)\s*\b(HH|LL|H|L|A|C)\*?$/.exec(res),val=fm?fm[1]:res,flag=fm?fm[2]:"";
+      if(/POC Glu|Glucose POC|Bedside Glu|Accu/i.test(name)){pc.poc.push({v:num(val),t:when,flag:flag});return;}
+      var old=pc.labs[name];
+      if(!old||old.t<when) pc.labs[name]={v:val,flag:flag,t:when};
+    }
+  });
+  return pc;
+}
+function readPrechart(file){
+  return pdfRowsXY(file).then(function(rows){var pc=parseDaily(rows);if(pc) pc.file=file.name;return pc;});
+}
+function sameRoom(a,b){
+  var k=function(r){return String(r||"").toUpperCase().replace(/^[A-Z]{1,4}\./,"").replace(/[\s.\/]+/g,"-").replace(/-0*(\w+)$/,"-$1");};
+  return !!a&&!!b&&k(a)===k(b);
+}
+// Pairs each Meditech summary with a patient: account number first, then room.
+// list: [{acct, room}] -> {hits:[[index, pc]], unmatched:[pc]}
+function matchPrechart(list,pcs){
+  var used={},hits=[],unmatched=[];
+  pcs.forEach(function(pc){
+    var i=-1;
+    if(pc.acct) list.forEach(function(p,j){if(i<0&&!used[j]&&p.acct&&p.acct===pc.acct) i=j;});
+    if(i<0&&pc.room) list.forEach(function(p,j){if(i<0&&!used[j]&&sameRoom(p.room,pc.room)) i=j;});
+    if(i<0){unmatched.push(pc);return;}
+    used[i]=1;hits.push([i,pc]);
+  });
+  return {hits:hits,unmatched:unmatched};
+}
+/* summary of one patient's PDF, for the back of the card */
+var FB={na:/^(Sodium|Na)$/i,k:/^(Potassium|K)$/i,cl:/^(Chloride|Cl)$/i,co2:/^(Carbon Dioxide|CO2|Total CO2|Bicarbonate|HCO3)$/i,
+  bun:/^(BUN|Urea Nitrogen|Blood Urea Nitrogen)$/i,cr:/^(Creatinine|Creat)$/i,glu:/^Glucose$/i,
+  wbc:/^(WBC|White Blood Cell.*)$/i,hgb:/^(Hgb|Hemoglobin)$/i,hct:/^(Hct|Hematocrit)$/i,plt:/^(Plt Count|Platelets?|Platelet Count|PLT)$/i};
+var ALWAYS=/^(Magnesium|Phosphorus|Phosphate|Lactic Acid|Lactate|Troponin.*|BNP|NT-?proBNP|INR|Procalcitonin)$/i;
+var NOISE=/^(RBC|MCV|MCH|MCHC|RDW.*|MPV|Nucleated.*|.*%.*|.*#.*|Globulin|Albumin\/Globulin.*|A\/G Ratio|Glomerular.*|eGFR.*|Anion Gap)$/i;
+var SHORT={"Total Bilirubin":"Tbili","Total Alk Phosphatase":"ALP","Alkaline Phosphatase":"ALP","Magnesium":"Mg","Phosphorus":"Phos","Phosphate":"Phos",
+  "Albumin":"Alb","Total Protein":"Prot","Calcium":"Ca","Lactic Acid":"Lactate","Procalcitonin":"PCT"};
+function lab(pc,re){
+  for(var n in pc.labs) if(re.test(n)) return pc.labs[n];
+  return null;
+}
+function arrow(f){return /H/.test(f)?"↑":/L/.test(f)?"↓":"";}
+function md(t){var d=new Date(t);return (d.getMonth()+1)+"/"+d.getDate();}
+function hm(t){var d=new Date(t);return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}
+function vitalsHtml(pc){
+  if(!pc.vit.length) return "";
+  var vs=pc.vit.slice().sort(function(a,b){return (a.tm||0)-(b.tm||0);});
+  function last(k){for(var i=vs.length-1;i>=0;i--){var x=vs[i][k];if(x!=null&&x!=="") return {s:String(x).trim(),tm:vs[i].tm};}return null;}
+  function one(k,lo,hi){
+    var l=last(k),n=l?num(l.s):null;if(n==null) return "—";
+    return (n<lo||n>hi)?"<b>"+n+"</b>":String(n);
+  }
+  var fever=pc.tUnit==="C"?38:100.4;
+  var tl=last("t"),tn=tl?num(tl.s):null,tS=tn==null?"—":tn.toFixed(1);
+  if(tn!=null&&tn>=fever) tS="<b>"+tS+"</b>";
+  var ts=pc.vit.map(function(v){return num(v.t);}).filter(function(x){return x!=null;}),tmax=ts.length?Math.max.apply(null,ts):null;
+  if(tmax!=null&&tmax>=fever&&tmax!==tn) tS+=" (Tmax <b>"+tmax.toFixed(1)+"</b>)";
+  var bl=last("bp"),bm=bl&&/(\d{2,3})\s*\/\s*(\d{2,3})/.exec(bl.s),bpS="—";
+  if(bm){bpS=bm[1]+"/"+bm[2];if(+bm[1]<90||+bm[1]>160) bpS="<b>"+bpS+"</b>";}
+  var lt=vs[vs.length-1].tm;
+  return "T "+tS+" · HR "+one("hr",50,100)+" · RR "+one("rr",10,22)+" · BP "+bpS+" · SpO₂ "+one("ox",92,100)+
+    (lt?' <span class="rp-vt">@'+md(lt)+" "+hm(lt)+"</span>":"");
+}
+function fv(x,y,l){
+  if(!l) return "";
+  return '<text x="'+x+'" y="'+y+'" class="rp-fv'+(l.flag?' rp-ab':'')+'">'+esc(l.v+arrow(l.flag))+'</text>';
+}
+function cbcSvg(pc){
+  var t=pc?fv(18,29,lab(pc,FB.wbc))+fv(55,19,lab(pc,FB.hgb))+fv(55,40,lab(pc,FB.hct))+fv(107,29,lab(pc,FB.plt)):"";
+  return '<svg viewBox="0 0 120 50" class="rp-fb"><line x1="36" y1="25" x2="74" y2="25"/><line x1="36" y1="8" x2="36" y2="42"/><line x1="74" y1="25" x2="92" y2="8"/><line x1="74" y1="25" x2="92" y2="42"/>'+t+'</svg>';
+}
+function bmpSvg(pc){
+  var t=pc?fv(22,19,lab(pc,FB.na))+fv(65,19,lab(pc,FB.cl))+fv(107,19,lab(pc,FB.bun))+fv(22,40,lab(pc,FB.k))+fv(65,40,lab(pc,FB.co2))+fv(107,40,lab(pc,FB.cr))+fv(160,29,lab(pc,FB.glu)):"";
+  return '<svg viewBox="0 0 170 50" class="rp-fb"><line x1="0" y1="25" x2="128" y2="25"/><line x1="44" y1="6" x2="44" y2="44"/><line x1="86" y1="6" x2="86" y2="44"/><line x1="128" y1="25" x2="150" y2="6"/><line x1="128" y1="25" x2="150" y2="44"/>'+t+'</svg>';
+}
+function otherLabs(pc){
+  var fb=[];for(var k in FB) fb.push(FB[k]);
+  var out=[];
+  Object.keys(pc.labs).forEach(function(n){
+    var l=pc.labs[n];
+    if(fb.some(function(re){return re.test(n);})) return;
+    if(!(ALWAYS.test(n)||(l.flag&&!NOISE.test(n)))) return;
+    var s=esc((SHORT[n]||n)+" "+l.v+arrow(l.flag));
+    out.push(l.flag?"<b>"+s+"</b>":s);
+  });
+  if(pc.poc.length){
+    var v=pc.poc.map(function(p){return p.v;}).filter(function(x){return x!=null;});
+    if(v.length){
+      var mn=Math.min.apply(null,v),mx=Math.max.apply(null,v),s="POC glu "+(mn===mx?mn:mn+"–"+mx)+" ("+v.length+")";
+      out.push(mn<70||mx>180?"<b>"+s+"</b>":s);
+    }
+  }
+  return out.join(" · ");
+}
+function labTime(pc){
+  var t=0;for(var n in pc.labs) if(pc.labs[n].t>t) t=pc.labs[n].t;
+  return t;
+}
+
+/* ---------------- AI summaries (Copilot / Claude) ----------------
+   The resident gives the chart text to their hospital AI with AI_PROMPT and pastes the
+   answers back here. One "### PT" block per patient; parsed in the browser and kept in
+   memory only (p.ai), like the Meditech PDFs. */
+var AI_PROMPT=[
+"You are helping an internal medicine resident pre-chart. From the chart text I paste, write ONE block per patient in exactly this format. Output only the blocks: no introduction, no bold, no tables.",
+"",
+"### PT",
+"Name: LAST, FIRST",
+"Room: ",
+"Acct: ",
+"Dx:",
+"1. ",
+"2. ",
+"3. ",
+"4. ",
+"PMH: ",
+"Meds:",
+"- ",
+"Imaging:",
+"- ",
+"",
+"Rules:",
+"- Use only what is in the chart text. Never guess. If something is not there, write —",
+"- KEEP EVERYTHING SHORT: it is printed in small fixed boxes. Use standard medical abbreviations, no full sentences, no articles.",
+"- Dx: the 4 most important problems that are STILL ACTIVE today (nothing resolved), most important first. MAX 6 WORDS (about 40 characters) each: the problem plus at most one key detail. Examples: Sepsis 2/2 E. coli UTI, abx D3 | AKI on CKD3b, Cr 1.6 | ADHF, net -1.8L | Hypokalemia, repleting",
+"- PMH: one line, comma-separated, most relevant first, MAX 6 items, 1-3 words each. Example: HFrEF 25%, CKD3b, T2DM (insulin), AFib (apixaban), HTN",
+"- Meds: ONLY ACTIVE inpatient medications as of the most recent date in the text. NOT active = discontinued, D/C, stopped, completed, expired, on hold, or only in an older note or the home med list. If notes disagree, trust the most recent active orders/MAR. If you cannot confirm a med is active, leave it out. Include only meds that treat Dx 1-4, plus anticoagulation and high-risk meds (drips, pressors, steroids, insulin, opioids). Skip vitamins, bowel regimen and unused PRNs. Max 6. Start each with the number of the Dx it treats, or [-] if it treats none of them. Mark NEW, ↑ or ↓ if started or changed in the last 24h. Format: [Dx#] drug dose route freq, MAX 5 words after the number. Examples: [1] Furosemide 80 IV BID ↑ | [2] Ceftriaxone 1g IV q24 D3 | [-] Apixaban 5 PO BID",
+"- Imaging: max 3 most recent relevant studies, newest first. Format: MODALITY M/D: impression, MAX 8 words. Example: CXR 11/16: improving bilat effusions",
+"- Room and Acct exactly as written in the chart (Acct looks like VR0001234567).",
+"",
+"Chart text:",
+""].join("\n");
+var AI_LBL={name:/^(name|patient|pt)$/i,room:/^(room|bed|rm)$/i,acct:/^(acct|acct no|account|account no|account number)$/i,
+  dx:/^(dx|diagnos[ie]s|main dx|top dx|problems?|active problems|assessment)$/i,pmh:/^(pmh|pmhx|past medical history|hx|history)$/i,
+  meds:/^(meds|medications|important meds|key meds)$/i,img:/^(imaging|images|radiology)$/i};
+var AI_NONE=/^[—–\-\s]*$|^(none|n\/a|not (documented|available|in (the )?(chart|text))|no imaging)\.?$/i;
+function aiBlock(t){
+  var o={name:"",room:"",acct:"",dx:[],pmh:[],meds:[],img:[]},cur=null,since=/^\s*Since:\s*(\d{1,2}\/\d{1,2})\s*\(([a-z,]*)\)/im.exec(t);
+  t.split("\n").forEach(function(raw){
+    var ln=raw.trim().replace(/^(?:[-•*·]|\d{1,2}[.)])\s*/,"").trim();
+    if(!ln) return;
+    var m=/^([A-Za-z][A-Za-z .\/]{0,28}?)\s*(?:\([^)]*\))?\s*:\s*(.*)$/.exec(ln),k=null;
+    if(m) for(var key in AI_LBL) if(AI_LBL[key].test(m[1].trim())) k=key;
+    if(k){
+      var v=m[2].trim();cur=k;
+      if(k==="name"||k==="room"||k==="acct"){o[k]=AI_NONE.test(v)?"":v;cur=null;}
+      else if(!AI_NONE.test(v)) o[k].push(v);
+      return;
+    }
+    if(cur&&!AI_NONE.test(ln)) o[cur].push(ln);
+  });
+  var a=/[A-Z]{1,4}\d{6,}/i.exec(o.acct);o.acct=a?a[0].toUpperCase():"";
+  o.pmh=o.pmh.join(", ");o.dx=o.dx.slice(0,4);o.meds=o.meds.slice(0,8);o.img=o.img.slice(0,4);
+  if(since){o._since=since[1];o._sinceKeys=since[2].split(",").filter(Boolean);}
+  return o;
+}
+// -> [{name, room, acct, dx:[], pmh:"", meds:[], img:[]}]
+function parseSummary(text){
+  text=String(text||"").replace(/\r/g,"").replace(/\*\*|__|`/g,"");
+  var parts=text.split(/^[ \t]*#{1,4}[ \t]*(?:PT|PATIENT)\b[^\n]*$/gim);
+  if(parts.length>1&&!/:\s*\S/.test(parts[0])) parts.shift();
+  return parts.map(aiBlock).filter(function(b){return b.dx.length||b.pmh||b.meds.length||b.img.length;});
+}
+function lastName(n){return clean(n).toUpperCase().split(",")[0].replace(/[^A-Z]/g,"");}
+// Account first, then room, then a last name that only one patient on the list has.
+function matchSummary(list,blocks){
+  var r=matchPrechart(list,blocks),used={},still=[];
+  r.hits.forEach(function(h){used[h[0]]=1;});
+  r.unmatched.forEach(function(b){
+    var ln=lastName(b.name),idx=[];
+    if(ln) list.forEach(function(p,j){if(!used[j]&&lastName(p.name||"")===ln) idx.push(j);});
+    if(idx.length===1){used[idx[0]]=1;r.hits.push([idx[0],b]);} else still.push(b);
+  });
+  r.unmatched=still;
+  return r;
+}
+/* Saving and reusing AI summaries. The .txt is the same "### PT" text the dialog reads, so it can
+   be opened, read or edited by hand. Nothing is kept by the app: the file stays with the user.
+   Merging: a fresh paste replaces each part it has (Dx, PMH, Meds, Imaging) and keeps the rest;
+   a saved file only fills parts that are still empty and marks them "↺ date" on the sheets. */
+var AI_KEYS=["dx","pmh","meds","img"];
+function aiHas(ai,k){return !!ai&&(k==="pmh"?!!ai.pmh:!!(ai[k]&&ai[k].length));}
+function aiMerge(cur,b,fromFile,date){
+  var o={dx:[],pmh:"",meds:[],img:[],old:{},from:""};
+  if(cur){AI_KEYS.forEach(function(k){o[k]=cur[k];});o.old=Object.assign({},cur.old||{});o.from=cur.from||"";}
+  AI_KEYS.forEach(function(k){
+    if(!aiHas(b,k)) return;
+    if(fromFile){
+      if(aiHas(o,k)) return;
+      o[k]=b[k];
+      var d=(b._sinceKeys&&b._sinceKeys.indexOf(k)>=0&&b._since)||date;
+      o.old[k]=d;
+    }else{o[k]=b[k];delete o.old[k];}
+  });
+  var ds=AI_KEYS.map(function(k){return o.old[k];}).filter(Boolean);
+  o.from=ds.length?ds.sort(function(a,b){var x=a.split("/"),y=b.split("/");return (x[0]-y[0])||(x[1]-y[1]);})[0]:"";
+  return o;
+}
+// A saved file is matched strictly: same account, or same last name + first name. Never by room
+// alone (yesterday's patient may be gone and someone new in that bed) nor by last name alone.
+function nameKey(n){var x=clean(n).toUpperCase().replace(/[^A-Z, ]/g,"").split(",");return x.length<2?"":x[0].replace(/ /g,"")+","+clean(x[1]).split(" ")[0];}
+function matchSaved(list,blocks){
+  var used={},hits=[],unmatched=[];
+  blocks.forEach(function(b){
+    var i=-1,k=nameKey(b.name);
+    if(b.acct) list.forEach(function(p,j){if(i<0&&!used[j]&&p.acct&&p.acct===b.acct) i=j;});
+    if(i<0&&k) list.forEach(function(p,j){if(i<0&&!used[j]&&nameKey(p.name||"")===k) i=j;});
+    if(i<0){unmatched.push(b);return;}
+    used[i]=1;hits.push([i,b]);
+  });
+  return {hits:hits,unmatched:unmatched};
+}
+function oldMark(ai,k){return ai&&ai.old&&ai.old[k]?'<span class="rp-old">↺ '+esc(ai.old[k])+'</span>':'';}
+function aiText(list){
+  var d=new Date(),out=["# Prechart AI summaries · saved "+(d.getMonth()+1)+"/"+d.getDate()+"/"+d.getFullYear(),
+    "# Open it with 🤖 AI summaries → 📂 Load saved. Each part fills only what is still empty.",""];
+  var n=0;
+  list.forEach(function(p){
+    var ai=p.ai;if(!ai||!AI_KEYS.some(function(k){return aiHas(ai,k);})) return;
+    n++;
+    out.push("### PT","Name: "+(p.name||""),"Room: "+(p.room||""),"Acct: "+(p.acct||""));
+    var ok=AI_KEYS.filter(function(k){return ai.old&&ai.old[k];});
+    if(ok.length) out.push("Since: "+ai.from+" ("+ok.join(",")+")");
+    out.push("Dx:");(ai.dx||[]).forEach(function(x,i){out.push((i+1)+". "+x);});
+    out.push("PMH: "+(ai.pmh||"—"),"Meds:");(ai.meds||[]).forEach(function(x){out.push("- "+x);});
+    out.push("Imaging:");(ai.img||[]).forEach(function(x){out.push("- "+x);});
+    out.push("");
+  });
+  return {text:out.join("\n"),n:n};
+}
+function savedDate(text,file){
+  var m=/saved (\d{1,2})\/(\d{1,2})\/\d{4}/.exec(text||"");
+  if(m) return m[1]+"/"+m[2];
+  var d=new Date(file&&file.lastModified||Date.now());return (d.getMonth()+1)+"/"+d.getDate();
+}
+// opts: list() -> [{acct, room, name, ai}], apply(index, ai), done(count)
+function summaryDialog(opts){
+  var d=document.getElementById("rp-ai");
+  if(!d){
+    d=document.createElement("dialog");d.id="rp-ai";
+    d.innerHTML='<h3>🤖 AI summaries · Dx · PMH · Meds · Imaging</h3>'+
+      '<ol><li><b>Copy prompt</b>, paste it in your hospital Copilot / Claude, then paste the patient\'s chart text under it (H&amp;P, last progress note, imaging reads, MAR).</li>'+
+      '<li>Paste the answers here: one patient or all of them at once (each starts with <code>### PT</code>).</li>'+
+      '<li><b>Apply</b>. It fills the Dx, PMH, Meds and Imaging spaces on the rounds sheets. Kept only until you close this page.</li>'+
+      '<li>To reuse them tomorrow: <b>💾 Save .txt</b> before closing. Tomorrow, <b>📂 Load saved</b> fills only what is still empty (marked ↺ on the sheets); a new paste always replaces it.</li></ol>'+
+      '<div class="rp-arow"><button type="button" data-a="copy">📋 Copy prompt</button><span class="rp-acp" style="font-size:12px;color:#555"></span></div>'+
+      '<textarea placeholder="### PT&#10;Name: DOE, JOHN&#10;Room: 226-B&#10;Acct: VR0000000101&#10;Dx:&#10;1. ...&#10;PMH: ...&#10;Meds:&#10;- [1] ...&#10;Imaging:&#10;- ..."></textarea>'+
+      '<div class="rp-amsg"></div>'+
+      '<div class="rp-arow"><button type="button" data-a="apply">Apply</button><button type="button" data-a="save">💾 Save .txt</button><button type="button" data-a="load">📂 Load saved</button><input type="file" accept=".txt,text/plain" hidden><button type="button" data-a="close">Close</button></div>';
+    document.body.appendChild(d);
+    var ta=d.querySelector("textarea"),msg=d.querySelector(".rp-amsg"),fin=d.querySelector("input[type=file]");
+    var run=function(text,fromFile,date){
+      var o=d._opts,blocks=parseSummary(text);
+      if(!blocks.length){msg.className="rp-amsg rp-warn";msg.textContent=fromFile?"No patient blocks in that file.":"No patient blocks found. Each one should start with ### PT and have Dx:, PMH:, Meds: or Imaging:.";return;}
+      var list=o.list(),res=fromFile?matchSaved(list,blocks):matchSummary(list,blocks);
+      res.hits.forEach(function(h){o.apply(h[0],aiMerge(list[h[0]].ai,h[1],fromFile,date));});
+      var done=res.hits.map(function(h){var p=list[h[0]];return esc((p.room||"?")+" "+lastName(p.name||""));});
+      var html=res.hits.length?(fromFile?"↺ Loaded from "+esc(date)+": ":"✓ Filled: ")+done.join(", ")+". Check that each is the right patient."+(fromFile?" Parts that already had today's summary were kept.":""):"";
+      if(res.unmatched.length){
+        html+=(html?"<br>":"")+(fromFile
+          ?"Not on today's list (skipped): "+res.unmatched.length+" patient"+(res.unmatched.length>1?"s":"")+"."
+          :"<b>No patient on the list for: "+res.unmatched.map(function(b){return esc(b.room||b.name||b.acct||"(no room/acct/name)");}).join(", ")+"</b>. Fix the Room or Acct line in the text and Apply again.");
+      }
+      msg.className="rp-amsg "+(res.unmatched.length&&!fromFile?"rp-warn":"rp-ok");msg.innerHTML=html;
+      if(!fromFile&&!res.unmatched.length) ta.value="";
+      if(o.done) o.done(res.hits.length);
+    };
+    fin.addEventListener("change",function(){
+      var f=fin.files[0];fin.value="";if(!f) return;
+      f.text().then(function(t){run(t,true,savedDate(t,f));});
+    });
+    d.addEventListener("click",function(e){
+      var a=e.target&&e.target.getAttribute&&e.target.getAttribute("data-a");if(!a) return;
+      if(a==="close"){d.close();return;}
+      if(a==="copy"){
+        var ok=function(){d.querySelector(".rp-acp").textContent="Copied ✓";};
+        if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(AI_PROMPT).then(ok,function(){fallbackCopy(AI_PROMPT);ok();});
+        else{fallbackCopy(AI_PROMPT);ok();}
+        return;
+      }
+      if(a==="load"){fin.click();return;}
+      if(a==="save"){
+        var r=aiText(d._opts.list());
+        if(!r.n){msg.className="rp-amsg rp-warn";msg.textContent="No AI summaries to save yet.";return;}
+        var dt=new Date(),fn="ai-summaries-"+dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0")+".txt";
+        var url=URL.createObjectURL(new Blob([r.text],{type:"text/plain"})),lk=document.createElement("a");
+        lk.href=url;lk.download=fn;document.body.appendChild(lk);lk.click();lk.remove();setTimeout(function(){URL.revokeObjectURL(url);},2000);
+        msg.className="rp-amsg rp-ok";msg.textContent="💾 Saved "+r.n+" patient"+(r.n>1?"s":"")+" to "+fn+". It has patient data: keep it like the printed list.";
+        return;
+      }
+      run(ta.value,false,"");
+    });
+  }
+  d._opts=opts;
+  d.querySelector(".rp-amsg").textContent="";d.querySelector(".rp-acp").textContent="";
+  d.showModal();
+  d.querySelector("textarea").focus();
+}
+function fallbackCopy(s){
+  var t=document.createElement("textarea");t.value=s;t.style.position="fixed";t.style.opacity="0";
+  document.body.appendChild(t);t.select();try{document.execCommand("copy");}catch(e){}document.body.removeChild(t);
+}
+
+/* ---------------- printed cards ---------------- */
+function rep(n,s){var o="";for(var i=0;i<n;i++)o+=s;return o;}
+var LN='<div class="rp-ln"></div>',TD='<div class="rp-td"><span class="rp-bx"></span><span class="rp-ln2"></span></div>';
+var CHK='<span class="rp-chk"><span class="rp-bx"></span>Seen <span class="rp-bx"></span>Note</span>';
+function hdr(p,front,pos){
+  var ps=pos?'<span class="rp-pos"'+(front?'':' style="margin-left:auto"')+'>'+pos+'</span>':'';
+  if(!p) return '<div class="rp-hd"><span class="rp-room rp-blank">&nbsp;</span><span class="rp-nm">&nbsp;</span>'+(front?CHK:'')+ps+'</div>';
+  var flag=(p.flag&&front)?'<span class="rp-flag">'+esc(p.flag)+'</span>':'';
+  var meta=front?'<span class="rp-meta">'+[p.dob?'DOB '+esc(p.dob):'',esc(p.acct),p.att?'Dr. '+esc(p.att):''].filter(Boolean).join(' · ')+'</span>':'<span class="rp-meta">Vitals · Labs · Imaging · PE</span>';
+  return '<div class="rp-hd"><span class="rp-room">'+esc(p.room)+'</span><span class="rp-nm">'+esc(p.name)+'</span><span class="rp-as">'+esc(p.age)+' '+esc(p.sex)+(losLabel(p.adm)?' · '+losLabel(p.adm):'')+'</span>'+meta+flag+(front?CHK:'')+ps+'</div>';
+}
+function fill(items,n,cls,num){
+  var o="";for(var i=0;i<n;i++){var t=items[i];o+=t?'<div class="'+cls+' rp-fl">'+(num?(i+1)+'. ':'')+esc(t)+'</div>':'<div class="'+cls+'">'+(num?(i+1)+'.':'')+'</div>';}
+  return o;
+}
+function front(p,i){
+  var pos=i==null?0:i%4+1;
+  var ai=(p&&p.ai)||{dx:[],pmh:"",meds:[],img:[]};
+  var pl=fill(ai.dx,6,"rp-pl",true);
+  var pmh=ai.pmh?'<div class="rp-ai rp-c2" style="height:2.5em;margin-bottom:5px">'+esc(ai.pmh)+'</div>':rep(2,LN);
+  return '<section class="rp-card'+(pos?' rp-p'+pos:'')+'">'+hdr(p,true,pos)+'<div class="rp-dx">Dx: '+(p?esc(p.dx):'')+'</div><div class="rp-cols rp-f">'+
+    '<div><div class="rp-s"><b>S:</b> <span class="rp-bx"></span>BM <span class="rp-bx"></span>Urine &nbsp;Pain ___ &nbsp;O₂ _______</div><div class="rp-lbl">PMH'+oldMark(p&&p.ai,"pmh")+'</div>'+pmh+'<div class="rp-lbl">PROBLEMS'+oldMark(p&&p.ai,"dx")+'</div>'+pl+'</div>'+
+    '<div><div class="rp-lbl">TO-DO</div>'+rep(9,TD)+'</div>'+
+    '<div><div class="rp-lbl">MEDS'+oldMark(p&&p.ai,"meds")+'</div>'+fill(ai.meds,Math.max(5,ai.meds.length),"rp-ln")+'<div class="rp-kv">DVT: ______________</div><div class="rp-kv">GI: ________________</div><div class="rp-kv">Dispo: _____________</div></div>'+
+    '</div></section>';
+}
+function back(p,i){
+  var pos=i==null?0:i%4+1,pc=p&&p.pc,left;
+  if(pc){
+    var lt=labTime(pc),today=new Date();today.setHours(0,0,0,0);
+    var stale=pc.run&&pc.run.getTime()<today.getTime()?' <b>⚠ PDF from '+md(pc.run)+'</b>':'';
+    var ol=otherLabs(pc);
+    left='<div class="rp-vs"><b>VS</b> '+(vitalsHtml(pc)||'BP ______ HR ____ RR ____ SpO₂ ____ T ____')+'</div>'+
+      '<div class="rp-fbs"><div><div class="rp-lbl">CBC</div>'+cbcSvg(pc)+'</div><div><div class="rp-lbl">BMP</div>'+bmpSvg(pc)+'</div></div>'+
+      '<div class="rp-src">Meditech'+(lt?' · labs '+md(lt)+' '+hm(lt):'')+stale+'</div>'+
+      (ol?'<div class="rp-ol">'+ol+'</div>'+LN:'<div class="rp-kv">Other labs:</div>'+rep(2,LN));
+  }else{
+    left='<div class="rp-vs">BP ______ HR ____ RR ____ SpO₂ ____ T ____</div><div class="rp-fbs"><div><div class="rp-lbl">CBC</div>'+cbcSvg(null)+'</div><div><div class="rp-lbl">BMP</div>'+bmpSvg(null)+'</div></div><div class="rp-kv">Other labs (Mg, Phos, trop, BNP…):</div>'+rep(3,LN);
+  }
+  return '<section class="rp-card'+(pos?' rp-p'+pos:'')+'">'+hdr(p,false,pos)+'<div class="rp-cols rp-b">'+
+    '<div>'+left+'</div>'+
+    '<div><div class="rp-kv">Imaging:'+oldMark(p&&p.ai,"img")+'</div>'+(p&&p.ai&&p.ai.img.length?'<div class="rp-ai" style="height:45px">'+p.ai.img.map(function(x){return '<div>'+esc(x)+'</div>';}).join("")+'</div>':rep(3,LN))+'<div class="rp-kv">PE:</div>'+rep(5,LN)+'</div>'+
+    '</div></section>';
+}
+var WCHK='<span class="rp-chk"><span class="rp-bx"></span>Seen <span class="rp-bx"></span>Note</span>';
+var WKV='<div class="rp-wkv"><div>DVT: <span class="rp-ln2"></span></div><div>GI: <span class="rp-ln2"></span></div><div>Dispo: <span class="rp-ln2"></span></div></div>';
+function wideRow(p){
+  var dem,lab;
+  if(p){
+    var meta=[esc(p.age)+' '+esc(p.sex)+(losLabel(p.adm)?' · <b>'+losLabel(p.adm)+'</b>':''),p.dob?'DOB '+esc(p.dob):'',esc(p.acct),p.att?'Dr. '+esc(p.att):''].filter(Boolean).join('<br>');
+    dem='<div class="rp-wtop"><span class="rp-room">'+esc(p.room)+'</span>'+WCHK+'</div><span class="rp-nm">'+esc(p.name)+'</span><span class="rp-meta">'+meta+'</span>'+
+      (p.flag?'<span class="rp-flag">'+esc(p.flag)+'</span>':'');
+  }else dem='<div class="rp-wtop"><span class="rp-room rp-blank">&nbsp;</span>'+WCHK+'</div>';
+  var pc=p&&p.pc;
+  if(pc){
+    var lt=labTime(pc),today=new Date();today.setHours(0,0,0,0);
+    var stale=pc.run&&pc.run.getTime()<today.getTime()?' <b>⚠ PDF from '+md(pc.run)+'</b>':'';
+    var ol=otherLabs(pc);
+    lab='<div class="rp-vs"><b>VS</b> '+(vitalsHtml(pc)||'BP ____ HR ___ RR ___ SpO₂ ___ T ___')+'</div>'+
+      '<div class="rp-fbs">'+cbcSvg(pc)+bmpSvg(pc)+'</div>'+(ol?'<div class="rp-ol">'+ol+'</div>':'')+
+      '<div class="rp-src">Meditech'+(lt?' · labs '+md(lt)+' '+hm(lt):'')+stale+'</div>';
+  }else{
+    lab='<div class="rp-vs">BP ____ HR ___ RR ___ SpO₂ ___ T ___</div><div class="rp-fbs">'+cbcSvg(null)+bmpSvg(null)+'</div>';
+  }
+  var ai=p&&p.ai,pmhCol="",dxCol=p?'<div class="rp-wdxt">'+esc(p.dx)+'</div>':'',imgCol="";
+  if(ai){
+    if(ai.pmh) pmhCol+='<div class="rp-wtxt rp-c4">'+oldMark(ai,"pmh")+esc(ai.pmh)+'</div>';
+    if(ai.meds.length) pmhCol+='<div class="rp-lbl">MEDS'+oldMark(ai,"meds")+'</div><div class="rp-wtxt rp-grow">'+ai.meds.map(function(x){return '<div class="rp-c1">'+esc(x)+'</div>';}).join('')+'</div>';
+    if(ai.dx.length) dxCol='<div class="rp-wdxl">'+ai.dx.map(function(x,i){return '<div class="rp-c2">'+(i?'':oldMark(ai,"dx"))+'<b>'+(i+1)+'.</b> '+esc(x)+'</div>';}).join("")+'</div>';
+    if(ai.img.length) imgCol='<div class="rp-wtxt rp-grow">'+ai.img.map(function(x,i){return '<div class="rp-c2" style="margin-bottom:2px">'+(i?'':oldMark(ai,"img"))+esc(x)+'</div>';}).join("")+'</div>';
+  }
+  return '<div class="rp-wrow"><div class="rp-wdem">'+dem+'</div><div>'+pmhCol+'</div><div class="rp-wdx">'+dxCol+WKV+'</div>'+
+    '<div class="rp-wlab">'+lab+'</div><div>'+imgCol+'</div><div>'+rep(7,TD)+'</div></div>';
+}
+var WIDE_HEAD='<div class="rp-wh"><div>Demographics</div><div>PMHx</div><div>Dx</div><div>Labs</div><div>Images</div><div>Pending</div></div>';
+function pageCss(landscape){
+  var el=document.getElementById("rp-pg");
+  if(!el){el=document.createElement("style");el.id="rp-pg";document.head.appendChild(el);}
+  el.textContent=landscape?"@page{size:letter landscape;margin:0.35in}":"";
+}
+function container(){
+  var el=document.getElementById("rp");
+  if(!el){el=document.createElement("div");el.id="rp";document.body.appendChild(el);}
+  return el;
+}
+// groups: [{title, rows:[{room,name,age,sex,dob,acct,att,dx,flag}]}]. Each group starts on its
+// own sheet (front + back), so a duplex stack can be split per resident.
+// opts.layout "wide": landscape, 3 patients per sheet, one-sided.
+function build(groups,opts){
+  opts=opts||{};
+  var d=new Date(),ds=(d.getMonth()+1)+"/"+d.getDate()+"/"+d.getFullYear();
+  var html="",wide=opts.layout==="wide";
+  pageCss(wide);
+  if(wide){
+    groups.forEach(function(g){
+      var list=g.rows.slice();
+      if(opts.blank||list.length===0){while(list.length%3!==0||list.length===0)list.push(null);}
+      var sheets=[];for(var i=0;i<list.length;i+=3)sheets.push(list.slice(i,i+3));
+      var title=esc(g.title||"____");
+      sheets.forEach(function(s,i){
+        html+='<div class="rp-page rp-w"><div class="rp-top"><b>Patient list</b><span>'+title+' · '+ds+'</span><span>Sheet '+(i+1)+'/'+sheets.length+'</span></div>'+WIDE_HEAD+s.map(wideRow).join("")+'</div>';
+      });
+    });
+    container().innerHTML=html;
+    return;
+  }
+  groups.forEach(function(g){
+    var list=g.rows.slice();
+    if(opts.blank||list.length===0){while(list.length%4!==0||list.length===0)list.push(null);}
+    var sheets=[];for(var i=0;i<list.length;i+=4)sheets.push(list.slice(i,i+4));
+    var title=esc(g.title||"____");
+    sheets.forEach(function(s,i){
+      var n=(i+1)+"/"+sheets.length;
+      html+='<div class="rp-page"><div class="rp-top"><b>Patient list · FRONT</b><span>2-sided: flip on LONG edge</span><span>'+title+' · '+ds+'</span><span>Sheet '+n+'</span></div>'+s.map(front).join("")+'</div>';
+      html+='<div class="rp-page"><div class="rp-top"><b>BACK · Labs / Imaging / PE</b><span>2-sided: flip on LONG edge</span><span>'+title+' · '+ds+'</span><span>Sheet '+n+'</span></div>'+s.map(back).join("")+'</div>';
+    });
+  });
+  container().innerHTML=html;
+}
+function print(groups,opts){
+  build(groups,opts);
+  document.body.classList.add("rp-on");
+  window.print();
+}
+window.addEventListener("afterprint",function(){document.body.classList.remove("rp-on");});
+
+return {pdfLines:pdfLines,parseCensus:parseCensus,isPdf:isPdf,build:build,print:print,
+  readPrechart:readPrechart,parseSummary:parseSummary,matchSummary:matchSummary,summaryDialog:summaryDialog,AI_PROMPT:AI_PROMPT,reportTime:reportTime,losAdmit:losAdmit,losLabel:losLabel,parseDaily:parseDaily,matchPrechart:matchPrechart,sameRoom:sameRoom,vitalsHtml:vitalsHtml,otherLabs:otherLabs};
+})();
+</script>
+
+</head>
+<body>
+<header>
+  <h1>Split patients</h1>
+  <div class="settings">
+    <label class="toggle">Cap per resident <input id="cap" type="number" min="1" max="30" value="7"></label>
+    <label class="toggle"><input id="initials" type="checkbox"> Initials only</label>
+  </div>
+  <button id="addRes">+ Resident</button>
+  <button id="auto">Auto-split</button>
+  <button id="copy" class="primary">Copy list</button>
+  <button id="print">Print</button>
+  <button id="pcBtn" title="Meditech: Daily Review → 24 Hour → print to PDF, one per patient. Select or drop all of them at once; labs and vitals go on the back of each rounds card.">🧪 Labs/Vitals</button>
+  <input type="file" id="pcFile" accept="application/pdf,.pdf" multiple hidden>
+  <button id="aiBtn" title="Paste the Copilot/Claude summaries: top 4 Dx, PMH, key meds, imaging. They print on the rounds sheets.">🤖 AI summary</button>
+  <select id="layout" title="Rounds sheet format">
+    <option value="cards">Cards · 4/sheet, 2-sided</option>
+    <option value="wide">Landscape · 3/sheet</option>
+  </select>
+  <button id="rounds" title="One set of rounds sheets per resident">🖨 Rounds sheets</button>
+  <button id="clear" class="ghost" title="Remove all patients">Clear</button>
+</header>
+
+<main>
+  <section class="input-panel" id="inputPanel">
+    <textarea id="raw" placeholder="Paste the team census from Epic here (Ctrl+A, Ctrl+C on the report, then Ctrl+V) — or drop the census PDF here / use 📄 Upload PDF."></textarea>
+    <div class="row">
+      <button class="primary" id="parse">Make cards</button>
+      <button id="pdfBtn" title="Read the census PDF directly (more reliable than copy-paste)">📄 Upload PDF</button>
+      <input type="file" id="pdfFile" accept="application/pdf,.pdf" hidden>
+      <button id="addOne">+ Add patient</button>
+      <button id="demo" class="ghost">Load fake example</button>
+      <span class="hint" id="parseInfo">Everything stays in this browser and the list is gone when you close the tab. The only thing ever sent to the sheet is room numbers, when you press “Add to My Beds”.</span>
+    </div>
+    <div class="row">
+      <span class="hint" id="contInfo"></span>
+      <button id="forget" class="ghost" hidden>Forget saved split</button>
+    </div>
+  </section>
+
+  <div class="board" id="board"></div>
+</main>
+
+<div id="printArea"></div>
+<div class="toast" id="toast"></div>
+
+<dialog id="editDlg">
+  <form method="dialog" id="editForm">
+    <strong id="editTitle">Edit patient</strong>
+    <label>Room</label><input name="bed" autocomplete="off">
+    <label>Name</label><input name="name" autocomplete="off">
+    <label>Age</label><input name="age" inputmode="numeric" autocomplete="off">
+    <div class="row" style="justify-content:space-between">
+      <button value="delete" id="delBtn" style="color:var(--danger)">Delete</button>
+      <span><button value="cancel">Cancel</button> <button value="ok" class="primary">Save</button></span>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(() => {
+"use strict";
+// ---------- state (patients live only in memory) ----------
+const POOL = "pool";
+let patients = [];      // {id,bed,name,age,owner,tags:{n,d,c}}
+let residents = [];     // {id,name}
+let selectedId = null;
+let uid = 1;
+const $ = s => document.querySelector(s);
+
+// Only resident names + cap are remembered (no patient data).
+function loadPrefs(){
+  try{
+    const p = JSON.parse(localStorage.getItem("split.prefs")||"null");
+    if(p && Array.isArray(p.residents) && p.residents.length){
+      const off = new Set(Array.isArray(p.noRounds)?p.noRounds:[]);
+      residents = p.residents.map(n=>({id:"r"+(uid++),name:String(n),noRounds:off.has(String(n)),isMe:p.me===String(n)}));
+      if(p.cap) $("#cap").value = p.cap;
+      if(p.layout) $("#layout").value = p.layout;
+      return;
+    }
+  }catch(e){}
+  residents = [{id:"r"+(uid++),name:"Resident 1"},{id:"r"+(uid++),name:"Resident 2"}];
+}
+function savePrefs(){
+  try{ localStorage.setItem("split.prefs",JSON.stringify({residents:residents.map(r=>r.name),noRounds:residents.filter(r=>r.noRounds).map(r=>r.name),me:(residents.find(r=>r.isMe)||{}).name||"",cap:+$("#cap").value||7,layout:$("#layout").value})); }catch(e){}
+}
+
+// ---------- parsing ----------
+const HEADER_WORDS = /^(bed|room|rm|cama|patient|name|nombre|age|edad|sex|mrn|unit|service|attending|los|diagnosis|dx|admit|my patients|list)\b/i;
+const NAME_RE = /([A-ZÁÉÍÓÚÑÜ][A-Za-zÁÉÍÓÚÑÜáéíóúñü'’\-]+(?:\s+[A-ZÁÉÍÓÚÑÜa-záéíóúñü][A-Za-zÁÉÍÓÚÑÜáéíóúñü'’\-]+)*)\s*,\s*([A-ZÁÉÍÓÚÑÜa-záéíóúñü][A-Za-zÁÉÍÓÚÑÜáéíóúñü'’\-]+(?:\s+[A-Za-zÁÉÍÓÚÑÜáéíóúñü'’\-\.]+){0,2})/;
+const AGE_RES = [
+  /\b(\d{1,3})\s*(?:y\.?\s?o\.?|yrs?|years?(?:\s+old)?|a(?:ños)?|y)(?=[\s\/,;)]|$)(?:\s*\/?\s*(?:[MF]|male|female)\b)?/i,
+  /\b(\d{1,3})\s*-?\s*(?:y\s*\/?\s*)?[MF]\b/,                 // 67 M, 67M, 67 y/F
+  /\b(?:age|edad)\s*:?\s*(\d{1,3})\b/i,
+  /\((\d{1,3})\)(?:\s*(?:[MF])\b)?/                                // (67) F
+];
+const BED_RES = [
+  /\b(?:bed|room|rm|cama|hab)\.?\s*:?\s*(\d?[A-Z]{0,4}\s?-?\s?\d{1,4}(?:\s?[-\/]\s?[A-Z0-9]{1,2})?[A-Z]?)\b/i,
+  /^\s*(\d?[A-Z]{1,4}\s?-?\s?\d{1,4}(?:\s?[-\/]\s?[A-Z0-9]{1,2})?[A-Z]?)\b/i,  // 4N-412, 5N-512-A, ICU 07, ER12
+  /^\s*(\d{2,4}(?:\s?[-\/]\s?[A-Z0-9]{1,2})?[A-Z]?)\b/i                       // 412, 412A, 412-1
+];
+// a whole column that is a bed: 412, 412A, 412-1, 4N-412, 4W 0412-01, MHE4W-412, ICU-07, T5 512 B, W412/01
+const BED_CELL = /^(?:[A-Z]{1,6}\d{0,2}[\s\-]?)?(?:\d{1,2}\s?[A-Z]{1,5}[\s\-\/]?)?[A-Z]{0,2}\d{2,4}(?:\s?[-\/]\s?[A-Z0-9]{1,3}|\s?[A-Z]{1,2})?$/i;
+// a bed somewhere inside a sentence: needs 3-4 digits, e.g. "DOE, JOHN 412-A 67 M"
+const BED_ANY = /(?:^|\s)(\d?[A-Z]{0,5}-?\d{3,4}(?:[-\/][A-Z0-9]{1,3}|[A-Z])?)(?=\s|$)/i;
+const NAME_STOP = /^(ADM|ADMIT|DR|MD|DO|MRN|CSN|DOB|LOS|ATT|PCP|DX|HX|RM|BED|M|F)\.?$/i;
+
+function clean(s){return s.replace(/\s+/g," ").trim()}
+function titleName(s){return clean(s).toUpperCase()}
+
+function tidyName(last, first){
+  // keep first name + up to 2 more words in the same style (e.g. "ANA LUCIA", "JUAN A"),
+  // so diagnoses or column text after the name are not swallowed.
+  const toks = clean(first).split(" ");
+  const caps = t => t === t.toUpperCase();
+  const style = caps(toks[0]);
+  const keep=[toks[0]];
+  for(const t of toks.slice(1,3)){
+    if(NAME_STOP.test(t)) break;
+    if(t.replace(/\./g,"").length===1){ keep.push(t); continue; }         // middle initial
+    if(caps(t)!==style || (style && t.length>2 && keep.length>=2)) break;
+    if(!style && !/^[A-ZÁÉÍÓÚÑ][a-záéíóúñ'’\-]+$/.test(t)) break;
+    keep.push(t);
+  }
+  return titleName(clean(last)+", "+keep.join(" "));
+}
+
+function normBed(b){ return clean(b).toUpperCase().replace(/\s*-\s*/g,"-").replace(/\s*\/\s*/g,"/"); }
+let bedCol = null;   // column index chosen by the user when automatic detection fails
+
+function parsePiece(line, cols){
+  let rest = " " + line + " ";
+  const out = {};
+  // strip long numbers (MRN, CSN, phone) and dates so they aren't taken as beds/ages
+  rest = rest.replace(/\b(?:mrn|csn|fin|acct)\s*[:#]?\s*\d+\b/gi," ").replace(/\b\d{6,}\b/g," ");
+  rest = rest.replace(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g," ");
+  ageLoop: for(const re of AGE_RES){
+    for(const m of rest.matchAll(new RegExp(re.source, re.flags.includes("g")?re.flags:re.flags+"g"))){
+      const a=+m[1];
+      if(a>=14 && a<=115 && !/[A-Z0-9]-?$/i.test(rest.slice(0,m.index))){ out.age=a; rest=rest.slice(0,m.index)+"  "+rest.slice(m.index+m[0].length); break ageLoop; }
+    }
+  }
+  // a) column chosen by the user
+  if(bedCol!=null && cols && cols[bedCol] && /\d/.test(cols[bedCol])){
+    out.bed = normBed(cols[bedCol]); rest = rest.replace(cols[bedCol],"  ");
+  }
+  // b) any column that is exactly a bed (bed may come after the name)
+  if(!out.bed && cols && cols.length>1){
+    for(const c of cols){
+      if(BED_CELL.test(c) && !NAME_RE.test(c) && !/^\d{1,3}$/.test(c)){ out.bed = normBed(c); rest = rest.replace(c,"  "); break; }
+    }
+  }
+  // c) bed at the start of the line / after "Bed:" "Room"
+  if(!out.bed) for(const re of BED_RES){
+    const m = rest.match(re);
+    if(m){ const b = normBed(m[1]); if(/\d/.test(b) && !/^\d$/.test(b)){ out.bed=b; rest = rest.replace(m[1],"  "); break; } }
+  }
+  // d) bed anywhere in the line (3-4 digits)
+  if(!out.bed){
+    const m = rest.match(BED_ANY);
+    if(m){ out.bed = normBed(m[1]); rest = rest.replace(m[1],"  "); }
+  }
+  // columns (tabs / 2+ spaces): look for the name segment by segment
+  for(const seg of rest.split(/\s{2,}/)){
+    const nm = seg.match(NAME_RE);
+    if(nm){ out.name = tidyName(nm[1], nm[2]); break; }
+  }
+  // bare age in its own column, e.g. "412  DOE, JANE  81"
+  if(out.age==null){
+    for(const seg of rest.split(/\s{2,}/).map(clean)){
+      if(/^\d{1,3}$/.test(seg) && +seg>=14 && +seg<=115 && out.bed){ out.age=+seg; break; }
+    }
+  }
+  return out;
+}
+
+// Census report format (Epic/HCA "Team" list): records like
+// "LAST, FIRST M 68Y Female LOS:7.5H Attending, Name MD <acct> <mrn> <payer> <dx> VR.213.A Inpatient",
+// grouped under "<Hospital>.<UNIT NAME>(n)" headers, with page footers mixed in.
+const REPORT_PT = /\b([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ'\-]*(?: [A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ'\-]*){0,2}), ([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ'\-]*(?: [A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ'\-]*){0,2}) (\d{1,3}) ?Y(?:O|RS?)? (Male|Female|M|F)\b/g;
+const REPORT_BED = /\b[A-Z]{1,4}\.(\d{1,4})\.([A-Z0-9]{1,3})\b/;
+const REPORT_UNIT = /\.([0-9A-Za-z][^().]{1,45}?)\s*\((\d+)\)/g;
+let lastExpected = null;
+function normSpace(text){ return text.replace(/[\u200b-\u200d\ufeff]/g,"").replace(/[\s\u00a0\u2007\u202f]+/g," "); }
+function looksLikeReport(text){ return /\b\d{1,3} ?Y ?(?:Male|Female|male|female|MALE|FEMALE)\b/.test(normSpace(text)); }
+let bedsByOrder = false;
+function parseReport(text){
+  const t = normSpace(text).replace(/(\d) ?Y ?(Male|Female|male|female|MALE|FEMALE)\b/g,(m,a,sx)=>a+"Y "+sx[0].toUpperCase()+sx.slice(1).toLowerCase());
+  bedsByOrder = false;
+  const exp = t.match(/Team[^()]{0,20}\((\d+)\)/i);
+  lastExpected = exp ? +exp[1] : null;
+  const units = [...t.matchAll(REPORT_UNIT)].map(m=>({at:m.index, name:clean(m[1])}));
+  const pts = [...t.matchAll(REPORT_PT)], rep = Rounds.reportTime(t);
+  const recs = pts.map((m,i)=>{
+    const end = i+1<pts.length ? pts[i+1].index : t.length;
+    const seg = t.slice(m.index+m[0].length, end);
+    const b = seg.match(REPORT_BED);
+    const u = units.filter(x=>x.at<m.index).pop();
+    return {
+      name: tidyName(m[1], m[2]),
+      age: +m[3],
+      sex: m[4][0].toUpperCase(),
+      bed: b ? `${b[1]}-${b[2]}` : "",
+      unit: u ? u.name : "",
+      adm: Rounds.losAdmit(seg.slice(0,24), rep)
+    };
+  });
+  // If the copy put the beds in a separate block (column-by-column PDF copy),
+  // and there are exactly as many beds as patients, pair them in order.
+  if(recs.some(r=>!r.bed)){
+    const all = [...t.matchAll(new RegExp(REPORT_BED.source,"g"))].map(b=>`${b[1]}-${b[2]}`);
+    if(all.length===recs.length){ recs.forEach((r,i)=>r.bed=all[i]); bedsByOrder = true; }
+  }
+  return recs;
+}
+
+function parseText(text){
+  lastExpected = null;
+  if(looksLikeReport(text)){ const r = parseReport(text); if(r.length) return r; }
+  const lines = text.split(/\r?\n/);
+  const recs = [];
+  let cur = null;
+  const flush = () => { if(cur && (cur.bed || cur.name)) recs.push(cur); cur=null; };
+  for(let raw of lines){
+    const line = raw.replace(/\t+/g,"  ").trim();
+    if(!line){ continue; }
+    if(HEADER_WORDS.test(line) && !NAME_RE.test(line)) continue;
+    const cols = raw.split(/\t|\s{2,}/).map(clean).filter(Boolean);
+    const p = parsePiece(line, cols);
+    if(!p.bed && !p.name && p.age==null) continue;
+    if(!cur){ cur = p; continue; }
+    const clash = (p.bed && cur.bed) || (p.name && cur.name) || (p.age!=null && cur.age!=null);
+    if(clash){ flush(); cur = p; }
+    else Object.assign(cur, Object.fromEntries(Object.entries(p).filter(([k,v])=>v!=null)));
+  }
+  flush();
+  return recs;
+}
+
+// ---------- helpers ----------
+function splitBed(b){
+  const m = (b||"").match(/^(.*?)(\d{2,})(.*)$/) || (b||"").match(/^(.*?)(\d+)(.*)$/);
+  return m ? {pre:m[1], num:m[2], post:m[3]} : null;
+}
+function bedKey(b){
+  if(!b) return "~~~~";
+  const s = splitBed(b); if(!s) return b;
+  return s.pre.padEnd(6,"~") + s.num.padStart(5,"0") + s.post;
+}
+function floorOf(b){
+  const s = splitBed(b); if(!s) return b||"";
+  return s.pre + (s.num.length>=3 ? s.num.slice(0,-2) : "");
+}
+const FLOOR_COLORS = ["#3b82f6","#10b981","#f59e0b","#ec4899","#8b5cf6","#14b8a6","#ef4444","#84cc16","#f97316","#06b6d4"];
+const floorColorMap = {};
+function floorColor(b, unit){
+  const f = unit || floorOf(b); if(!f) return "";
+  if(!(f in floorColorMap)) floorColorMap[f] = FLOOR_COLORS[Object.keys(floorColorMap).length % FLOOR_COLORS.length];
+  return floorColorMap[f];
+}
+function displayName(n){
+  if(!n) return "— no name —";
+  if(!$("#initials").checked) return n;
+  const [last,first=""] = n.split(",").map(s=>s.trim());
+  return (first[0]||"") + "." + (last[0]||"") + ".";
+}
+function byOwner(o){ return patients.filter(p=>p.owner===o).sort((a,b)=>bedKey(a.bed)<bedKey(b.bed)?-1:1); }
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),1800); }
+function esc(s){ return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// ---------- My Beds check (only for the column marked ★ Me) ----------
+// Reads the Active beds from the sheet and compares rooms. Nothing is written unless
+// "Add to My Beds" is pressed, and then only the room number (what My Beds stores anyway).
+const GAS = !!(window.google && google.script && google.script.run);
+let myBeds = null, myBedsErr = "", addingMb = false;
+function loadMyBeds(){
+  if(!GAS || !residents.some(r=>r.isMe)) return;
+  google.script.run
+    .withSuccessHandler(st=>{ myBeds = st.beds.map(b=>({room:b.room, dc:b.dcPending})); myBedsErr=""; render(); })
+    .withFailureHandler(e=>{ myBedsErr = e.message||String(e); render(); })
+    .getState();
+}
+// 226-B, 226B, VR.226.B and 0226-b all count as the same room.
+function roomK(b){ return String(b||"").toUpperCase().replace(/^[A-Z]{1,4}\./,"").replace(/[^A-Z0-9]/g,"").replace(/^0+(?=\d)/,""); }
+function myBedsDiff(list){
+  const mb = new Set(myBeds.map(b=>roomK(b.room)));
+  const mine = list.filter(p=>p.bed).map(p=>p.bed);
+  const mk = new Set(mine.map(roomK));
+  return {
+    both: mine.filter(b=>mb.has(roomK(b))),
+    missing: mine.filter(b=>!mb.has(roomK(b))),
+    extra: myBeds.filter(b=>!b.dc && !mk.has(roomK(b.room))).map(b=>b.room),
+    noBed: list.filter(p=>!p.bed).length
+  };
+}
+function myBedsHtml(list){
+  if(!GAS) return `<div class="mb">My Beds check works in the web app (not in a local copy).</div>`;
+  if(myBedsErr) return `<div class="mb warn"><span class="w">Could not read My Beds:</span> ${esc(myBedsErr)}</div>`;
+  if(!myBeds) return `<div class="mb">Checking My Beds…</div>`;
+  const d = myBedsDiff(list);
+  const rows = [];
+  if(!d.missing.length && !d.extra.length) rows.push(`<span class="ok">✓ My Beds matches (${d.both.length})</span>`);
+  else rows.push(`<span class="ok">✓ ${d.both.length} match My Beds</span>`);
+  if(d.missing.length) rows.push(`<span class="w">⚠ Missing in My Beds:</span> ${d.missing.map(esc).join(", ")}<br><button data-addmb ${addingMb?"disabled":""}>${addingMb?"Adding…":"Add to My Beds"}</button>`);
+  if(d.extra.length) rows.push(`<span class="w">⚠ Only in My Beds:</span> ${d.extra.map(esc).join(", ")} <span style="color:var(--muted)">(discharge or room change? fix it in My Beds)</span>`);
+  if(d.noBed) rows.push(`<span class="w">${d.noBed} card${d.noBed>1?"s":""} without a room</span> (not compared)`);
+  return `<div class="mb ${d.missing.length||d.extra.length?"warn":""}">${rows.join("<br>")}</div>`;
+}
+async function addToMyBeds(){
+  const r = residents.find(x=>x.isMe); if(!r || !myBeds || addingMb) return;
+  const missing = myBedsDiff(byOwner(r.id)).missing;
+  if(!missing.length) return;
+  addingMb = true; render();
+  const call = room => new Promise((ok, fail)=>google.script.run.withSuccessHandler(ok).withFailureHandler(fail).addBed({room, triage:"OK"}));
+  let added = 0;
+  try{
+    for(const room of missing){ const st = await call(room); added++; myBeds = st.beds.map(b=>({room:b.room, dc:b.dcPending})); }
+    toast(`Added to My Beds: ${missing.join(", ")}`);
+  }catch(e){
+    toast(`Added ${added}, then failed: ${e.message||e}`);
+  }finally{
+    addingMb = false; render();
+  }
+}
+
+// ---------- render ----------
+function render(){
+  const cap = +$("#cap").value || 7;
+  const board = $("#board");
+  const cols = [{id:POOL,name:"Unassigned",pool:true}, ...residents];
+  board.innerHTML = cols.map(c=>{
+    const list = byOwner(c.id);
+    const n = list.length;
+    const nn = list.filter(p=>p.tags.n).length, dd=list.filter(p=>p.tags.d).length, cc=list.filter(p=>p.tags.c).length;
+    const title = c.pool
+      ? `<span class="pool-name">Unassigned</span>`
+      : `<input value="${esc(c.name)}" data-rename="${c.id}" aria-label="Resident name">
+         ${GAS?`<button class="ghost metog ${c.isMe?"on":""}" data-me="${c.id}" title="${c.isMe?"This is you: your rooms are compared with My Beds. Click to unset.":"Mark as you, to compare your rooms with My Beds"}">${c.isMe?"★ Me":"☆ Me"}</button>`:""}
+         <button class="ghost rtog ${c.noRounds?"off":""}" data-rtoggle="${c.id}" title="${c.noRounds?"No rounds sheet for this resident (remembered). Click to turn it on.":"Gets rounds sheets. Click if this resident doesn't want them (remembered)."}">🖨${c.noRounds?"✗":"✓"}</button>
+         <button class="ghost" data-remove="${c.id}" title="Remove resident">✕</button>`;
+    const countHtml = c.pool ? `<span class="count">${n}</span>` : `<span class="count ${n>cap?"over":""}">${n}/${cap}</span>`;
+    return `<div class="col ${c.pool?"pool":""}" data-drop="${c.id}">
+      <div class="col-head" data-head="${c.id}">
+        <div class="col-title">${title}${countHtml}</div>
+        ${c.pool?"":`<div class="stats"><span>New <b>${nn}</b></span><span>D/C <b>${dd}</b></span><span>Complex <b>${cc}</b></span></div>`}
+      </div>
+      ${GAS && c.isMe && n ? myBedsHtml(list) : ""}
+      <div class="cards">${list.map(cardHtml).join("") || `<div class="empty">${c.pool?(patients.length?"All assigned ✓":"Paste the list above"):"Drag patients here"}</div>`}</div>
+    </div>`;
+  }).join("");
+}
+function cardHtml(p){
+  const needs = !p.bed || !p.name || p.age==null;
+  return `<div class="card ${needs?"needs":""} ${selectedId===p.id?"selected":""}" data-id="${p.id}" style="--floor:${floorColor(p.bed, p.unit)}">
+    <div class="bed">${esc(p.bed||"?")}</div>
+    <div class="who">
+      <div class="name">${esc(displayName(p.name))}</div>
+      <div class="meta">${p.age!=null?esc(p.age)+"y"+(p.sex?" "+esc(p.sex):""):"<span style='color:var(--warn)'>age ?</span>"}
+        <button class="tag n ${p.tags.n?"on":""}" data-tag="n" title="New admission">N</button>
+        <button class="tag d ${p.tags.d?"on":""}" data-tag="d" title="Possible discharge">D</button>
+        <button class="tag c ${p.tags.c?"on":""}" data-tag="c" title="Complex / sick">C</button>
+        ${p.pc?`<span class="pcb" title="Meditech labs/vitals loaded — printed on the back of the rounds card">🧪</span>`:""}
+        ${p.ai?`<span class="pcb" title="AI summary loaded: ${esc([p.ai.dx.length+" Dx", p.ai.pmh?"PMH":"", p.ai.meds.length+" meds", p.ai.img.length+" imaging"].filter(Boolean).join(", "))}">🤖</span>`:""}
+      </div>
+      ${p.unit?`<div class="unit">${esc(p.unit)}</div>`:""}
+      ${p.prev?`<div class="prev" title="Had this patient on the last saved split">↩ ${esc(p.prev)}</div>`:""}
+    </div>
+    <div class="actions">
+      <span class="handle" title="Drag">⋮⋮</span>
+      <button class="ghost" data-edit title="Edit">✎</button>
+    </div>
+  </div>`;
+}
+
+// ---------- actions ----------
+function addPatients(recs){
+  const existing = new Set(patients.map(p=>(p.bed||"")+"|"+(p.name||"")));
+  let added=0;
+  for(const r of recs){
+    const k=(r.bed||"")+"|"+(r.name||"");
+    if(existing.has(k)) continue;
+    existing.add(k);
+    patients.push({id:"p"+(uid++),bed:r.bed||"",name:r.name||"",age:r.age??null,sex:r.sex||"",unit:r.unit||"",adm:r.adm??null,owner:POOL,tags:{n:false,d:false,c:false}});
+    added++;
+  }
+  return added;
+}
+function move(pid, owner){
+  const p = patients.find(x=>x.id===pid); if(!p) return;
+  p.owner = owner; selectedId=null; render();
+}
+// ---------- continuity: each patient goes back to whoever had them last time ----------
+// Saved only in this browser, and dropped after 48 h. A patient is stored as a salted
+// SHA-256 code of the name (never the name itself), plus the room and the resident's name.
+const HIST_KEY = "split.history.v1", HIST_MS = 48*3600*1000;
+let hist = {salt:"", days:[]};
+let prevDay = null;   // most recent saved split from an earlier day: {date, savedAt, entries:[{h,bed,res}]}
+function localDate(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function storeHist(){ try{ localStorage.setItem(HIST_KEY, JSON.stringify(hist)); }catch(e){} }
+function loadHist(){
+  try{ const st = JSON.parse(localStorage.getItem(HIST_KEY)||"null"); if(st && st.salt) hist = st; }catch(e){}
+  if(!hist.salt) hist = {salt:[...crypto.getRandomValues(new Uint32Array(4))].join("-"), days:[]};
+  hist.days = (hist.days||[]).filter(d=>Date.now()-d.savedAt < HIST_MS);
+  storeHist();
+  const today = localDate();
+  prevDay = hist.days.filter(d=>d.date!==today).sort((a,b)=>b.savedAt-a.savedAt)[0] || null;
+  showCont();
+}
+function showCont(){
+  const n = prevDay ? prevDay.entries.length : 0;
+  $("#contInfo").textContent = prevDay
+    ? `Continuity: using the split saved ${new Date(prevDay.savedAt).toLocaleString("en-US",{weekday:"short",hour:"numeric",minute:"2-digit"})} (${n} patients). Auto-split sends each one back to the same resident.`
+    : "Continuity: Copy list or Print saves today's split (coded, no names) in this browser for 48 h, so tomorrow each patient goes back to the same resident.";
+  $("#forget").hidden = !hist.days.length;
+}
+async function nameHash(n){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(hist.salt+"|"+clean(n||"").toUpperCase()));
+  return [...new Uint8Array(buf)].slice(0,12).map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+// Saves who has whom right now as today's split (replaces an earlier save from today).
+async function saveSplit(){
+  const entries = [];
+  for(const r of residents) for(const p of byOwner(r.id)){
+    if(p.name) entries.push({h:await nameHash(p.name), bed:p.bed||"", res:r.name});
+  }
+  if(!entries.length) return;
+  const today = localDate();
+  hist.days = hist.days.filter(d=>d.date!==today);
+  hist.days.push({date:today, savedAt:Date.now(), entries});
+  storeHist(); showCont();
+}
+// Tags each patient with the resident who had them on the last saved day.
+// Matched by name; by room only when the card has no name, because a room often
+// gets a new admission after a discharge.
+async function markReturning(list){
+  if(!prevDay) return 0;
+  const byH = new Map(prevDay.entries.map(e=>[e.h,e]));
+  let n = 0;
+  for(const p of list){
+    const e = p.name ? byH.get(await nameHash(p.name)) : (p.bed && prevDay.entries.find(x=>x.bed===p.bed));
+    p.prev = e ? e.res : "";
+    if(e) n++;
+  }
+  return n;
+}
+
+function autoAssign(){
+  if(!residents.length){ toast("Add at least one resident"); return; }
+  // continuity first: patients go back to yesterday's resident if that resident is here today
+  const resByName = new Map(residents.map(r=>[r.name.trim().toUpperCase(), r]));
+  let back = 0;
+  for(const p of byOwner(POOL)){
+    const r = p.prev && resByName.get(p.prev.trim().toUpperCase());
+    if(r){ p.owner = r.id; back++; }
+  }
+  const pool = byOwner(POOL);
+  if(!pool.length){ render(); toast(back ? `${back} back with the same resident` : "No unassigned patients"); return; }
+  const total = patients.length;
+  const target = Math.ceil(total / residents.length);
+  // keep contiguous beds (same floor) together: fill each resident up to target in bed order,
+  // starting with whoever has the fewest.
+  const order = [...residents].sort((a,b)=>byOwner(a.id).length-byOwner(b.id).length);
+  let i=0;
+  for(const p of pool){
+    while(i<order.length-1 && byOwner(order[i].id).length>=target) i++;
+    p.owner = order[i].id;
+  }
+  render(); toast((back ? `${back} back with the same resident · ` : "") + "Split done — drag to adjust");
+}
+function buildText(){
+  const d = new Date().toLocaleDateString("en-US",{weekday:"long",day:"numeric",month:"numeric",year:"numeric"});
+  let out = `Patients — ${d}\n`;
+  for(const r of residents){
+    const list = byOwner(r.id);
+    out += `\n${r.name} (${list.length})\n`;
+    for(const p of list){
+      const t = [p.tags.n?"new":"",p.tags.d?"possible D/C":"",p.tags.c?"complex":""].filter(Boolean).join(", ");
+      out += `• ${p.bed||"?"} — ${displayName(p.name)}${p.age!=null?", "+p.age+(p.sex||""):""}${t?" ["+t+"]":""}\n`;
+    }
+  }
+  const un = byOwner(POOL);
+  if(un.length) out += `\nUnassigned (${un.length})\n` + un.map(p=>`• ${p.bed||"?"} — ${displayName(p.name)}${p.age!=null?", "+p.age:""}`).join("\n") + "\n";
+  return out;
+}
+async function copyText(){
+  if(!patients.length){ toast("No patients yet"); return; }
+  saveSplit();
+  const txt = buildText();
+  try{ await navigator.clipboard.writeText(txt); toast("List copied ✓"); }
+  catch(e){
+    const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); toast("List copied ✓"); }catch(_){ toast("Could not copy"); }
+    ta.remove();
+  }
+}
+function printLists(){
+  const d = new Date().toLocaleDateString("en-US");
+  $("#printArea").innerHTML = residents.map(r=>{
+    const list = byOwner(r.id);
+    return `<section><h2>${esc(r.name)} — ${list.length} patients · ${d}</h2><table>${
+      list.map(p=>`<tr><td class="b">${esc(p.bed)}</td><td class="seen"><span class="box"></span></td><td>${esc(displayName(p.name))}${p.age!=null?", "+p.age:""}</td><td class="notes"></td></tr>`).join("")
+    }</table></section>`;
+  }).join("");
+  saveSplit();
+  window.print();
+}
+function printRounds(){
+  if(!patients.length){ toast("No patients yet"); return; }
+  const row = p => ({
+    room:p.bed, name:displayName(p.name), age:p.age??"", sex:p.sex||"", dob:"",
+    acct:p.info?.acct||"", att:p.info?.att||"", dx:p.info?.dx||"", pc:p.pc||null, ai:p.ai||null, adm:p.adm,
+    flag:[p.tags.n&&"NEW", p.tags.d&&"D/C", p.tags.c&&"COMPLEX", p.info?.obs&&"OBS"].filter(Boolean).join(" · ")
+  });
+  const withPts = residents.filter(r=>byOwner(r.id).length);
+  const on = withPts.filter(r=>!r.noRounds), off = withPts.filter(r=>r.noRounds);
+  const groups = on.map(r=>({title:r.name, rows:byOwner(r.id).map(row)}));
+  const pool = byOwner(POOL);
+  if(pool.length) groups.push({title:"Unassigned", rows:pool.map(row)});
+  if(!groups.length){ toast("Every resident with patients has 🖨 turned off"); return; }
+  toast(`Rounds sheets for ${on.map(r=>r.name).join(", ")||"nobody"}`+(off.length?` (${off.map(r=>r.name).join(", ")} off)`:"")+(pool.length?` + ${pool.length} unassigned`:""));
+  saveSplit();
+  Rounds.print(groups, {blank:true, layout:$("#layout").value});
+}
+
+// ---------- edit dialog ----------
+let editingId = null;
+function openEdit(pid){
+  const dlg=$("#editDlg"), f=$("#editForm");
+  const p = pid ? patients.find(x=>x.id===pid) : {bed:"",name:"",age:""};
+  editingId = pid;
+  $("#editTitle").textContent = pid ? "Edit patient" : "Add patient";
+  $("#delBtn").style.visibility = pid ? "visible" : "hidden";
+  f.bed.value=p.bed||""; f.name.value=p.name||""; f.age.value=p.age??"";
+  dlg.showModal(); f.bed.focus();
+}
+// Enter in a field means Save. Without this the browser presses the first button in the
+// form, which is Delete (even while hidden for a new patient).
+$("#editForm").addEventListener("keydown", e=>{
+  if(e.key==="Enter" && e.target.tagName==="INPUT"){ e.preventDefault(); $("#editDlg").close("ok"); }
+});
+$("#editDlg").addEventListener("close",()=>{
+  const v=$("#editDlg").returnValue, f=$("#editForm");
+  if(v==="ok"){
+    const data={bed:clean(f.bed.value).toUpperCase(),name:titleName(f.name.value),age:f.age.value.trim()===""?null:+f.age.value};
+    let p;
+    if(editingId){ p = patients.find(x=>x.id===editingId); Object.assign(p,data); }
+    else if(data.bed||data.name){ p = {id:"p"+(uid++),...data,owner:POOL,tags:{n:false,d:false,c:false}}; patients.push(p); }
+    // a fixed name may now match yesterday's split
+    if(p) markReturning([p]).then(render);
+  } else if(v==="delete" && editingId){
+    patients = patients.filter(x=>x.id!==editingId);
+  }
+  editingId=null; render();
+});
+
+// ---------- events ----------
+let lastBatch = null;   // {text, ids} of the last paste, so it can be re-read with a chosen bed column
+function runParse(text){ runRecs(parseText(text), text); }
+function runRecs(recs, text){
+  const before = new Set(patients.map(p=>p.id));
+  const added = addPatients(recs);
+  const ids = patients.filter(p=>!before.has(p.id)).map(p=>p.id);
+  lastBatch = {text, ids};
+  const mine = patients.filter(p=>ids.includes(p.id));
+  const noBed = mine.filter(p=>!p.bed).length;
+  const review = mine.filter(p=>!p.bed||!p.name||p.age==null).length;
+  const info = $("#parseInfo");
+  info.innerHTML = added
+    ? esc(`${added} patient${added>1?"s":""} added` + (lastExpected!=null?(added===lastExpected?` (report says ${lastExpected} ✓).`:` — check: the report says ${lastExpected}.`):".") + (review?` ${review} in orange: fix with ✎ (missing room, name or age).`:""))
+    : "No patients found in that text. Try copying again or add them by hand.";
+  // automatic detection missed beds → let the user point at the bed column
+  const sample = text.split(/\r?\n/).map(l=>l.split(/\t|\s{2,}/).map(clean).filter(Boolean)).find(c=>c.length>1 && c.some(x=>NAME_RE.test(x)));
+  if(added && noBed && sample){
+    info.innerHTML += `<div class="pickcol"><b>Room not found for ${noBed}.</b> Tap the column that is the room:<br>${
+      sample.map((c,i)=>`<button data-col="${i}">${esc(c)}</button>`).join("")}</div>`;
+  }
+  if(added && bedsByOrder) info.innerHTML += ` <b style="color:var(--warn)">Rooms came separate from the names and were matched in order — please check them.</b>`;
+  if(added) $("#raw").value="";
+  render();
+  markReturning(mine).then(n=>{
+    if(n) info.insertAdjacentHTML("beforeend", ` <b style="color:var(--accent)">${n} had a resident on the last saved split (↩) — Auto-split sends them back.</b>`);
+    render();
+  });
+}
+$("#parse").onclick = () => runParse($("#raw").value);
+
+// ---------- PDF upload ----------
+// Read in this browser by the shared reader in Rounds.html; the file is never uploaded.
+// The census rows also give each patient's attending, account and Dx for the rounds sheets.
+async function readPdf(file){
+  if(!file) return;
+  if(!Rounds.isPdf(file)){ toast("That is not a PDF"); return; }
+  const info=$("#parseInfo"); info.textContent="Reading PDF…";
+  try{
+    const lines = await Rounds.pdfLines(file);
+    if(!lines.length){ info.textContent="This PDF has no text (scanned image?). Copy-paste the census or add patients by hand."; return; }
+    const before = new Set(patients.map(p=>p.id));
+    const text = lines.map(l=>l.replace("\t","  ")).join("\n");
+    const census = Rounds.parseCensus(lines);
+    if(census.rows.length){
+      // team census: read row by row (handles names that wrap to a second line)
+      lastExpected = census.expected; bedsByOrder = false;
+      runRecs(census.rows.map(c=>{
+        const i = c.name.indexOf(",");
+        return {name: i>0 ? tidyName(c.name.slice(0,i), c.name.slice(i+1)) : titleName(c.name),
+                age: +c.age, sex: c.sex==="U" ? "" : c.sex, bed: c.room ? normBed(c.room) : "",
+                unit: c.unit||"", adm: c.adm};
+      }), text);
+    } else runParse(text);
+    attachDetails(patients.filter(p=>!before.has(p.id)), census.rows);
+  }catch(err){ info.textContent="Could not read the PDF: "+err.message; }
+}
+function attachDetails(list, census){
+  const used = new Set();
+  const key = n => clean(n||"").toUpperCase().replace(/[^A-Z,]/g,"");
+  for(const p of list){
+    let i = census.findIndex((c,j)=>!used.has(j) && c.room && normBed(c.room)===p.bed);
+    if(i<0 && p.name) i = census.findIndex((c,j)=>!used.has(j) && key(c.name).startsWith(key(p.name).slice(0,12)));
+    if(i<0) continue;
+    used.add(i);
+    const c = census[i];
+    p.info = {att:c.att, acct:c.acct, dx:c.dx, obs:c.flag==="OBS"};
+    if(!p.sex) p.sex = c.sex;
+    if(p.adm==null) p.adm = c.adm;
+  }
+}
+// ---------- Meditech labs/vitals (24 Hour PDFs) ----------
+// Kept only in memory (p.pc): never saved in the browser or sent to the sheet.
+async function loadPrechart(files){
+  files = [...(files||[])].filter(Rounds.isPdf);
+  if(!files.length) return;
+  if(!patients.length){ toast("Load the census first, then the Meditech PDFs"); return; }
+  const info=$("#parseInfo"); info.textContent=`Reading ${files.length} Meditech PDF${files.length>1?"s":""}…`;
+  const pcs=[], other=[];
+  for(const f of files){
+    try{ const pc=await Rounds.readPrechart(f); pc ? pcs.push(pc) : other.push(f.name); }
+    catch(err){ other.push(f.name); }
+  }
+  const {hits, unmatched} = Rounds.matchPrechart(patients.map(p=>({acct:p.info?.acct||"", room:p.bed})), pcs);
+  hits.forEach(([i,pc])=>{ patients[i].pc = pc; });
+  render();
+  const missing = patients.filter(p=>!p.pc).length;
+  let msg = `🧪 Labs/vitals loaded for ${hits.length} patient${hits.length===1?"":"s"}.`;
+  if(missing) msg += ` ${missing} without a PDF (their cards print blank).`;
+  if(unmatched.length) msg += ` <b style="color:var(--warn)">No patient on this list for: ${unmatched.map(pc=>esc(pc.room||pc.file)).join(", ")}.</b>`;
+  if(other.length) msg += ` <b style="color:var(--warn)">Not a Meditech "24 Hour" PDF: ${other.map(esc).join(", ")}.</b>`;
+  info.innerHTML = msg;
+  toast(`🧪 ${hits.length} matched`);
+}
+$("#pcBtn").onclick = () => $("#pcFile").click();
+// ---------- AI summaries (Copilot/Claude answers pasted back; memory only, as p.ai) ----------
+$("#aiBtn").onclick = () => {
+  if(!patients.length){ toast("Load the census first, then the AI summaries"); return; }
+  Rounds.summaryDialog({
+    list: () => patients.map(p=>({acct:p.info?.acct||"", room:p.bed, name:p.name, ai:p.ai})),
+    apply: (i, ai) => { patients[i].ai = ai; },
+    done: n => { render(); if(n) toast(`🤖 ${n} filled`); }
+  });
+};
+$("#pcFile").onchange = e => { loadPrechart(e.target.files); e.target.value=""; };
+// Dropping PDFs anywhere except the census box loads them as Meditech PDFs.
+document.addEventListener("dragover", e=>{ if([...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
+document.addEventListener("drop", e=>{
+  if(e.target.closest && e.target.closest("#raw")) return;
+  const fs=[...(e.dataTransfer.files||[])].filter(Rounds.isPdf);
+  if(fs.length){ e.preventDefault(); loadPrechart(fs); }
+});
+$("#pdfBtn").onclick = () => $("#pdfFile").click();
+$("#pdfFile").onchange = e => { readPdf(e.target.files[0]); e.target.value=""; };
+$("#raw").addEventListener("dragover", e=>{ if([...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
+$("#raw").addEventListener("drop", e=>{
+  const f=[...(e.dataTransfer.files||[])].find(f=>/\.pdf$/i.test(f.name)||f.type==="application/pdf");
+  if(f){ e.preventDefault(); readPdf(f); }
+});
+$("#parseInfo").addEventListener("click", e=>{
+  const i = e.target.dataset.col; if(i==null || !lastBatch) return;
+  bedCol = +i;
+  patients = patients.filter(p=>!lastBatch.ids.includes(p.id));
+  runParse(lastBatch.text);
+  toast("Room column set");
+});
+$("#addOne").onclick = () => openEdit(null);
+$("#demo").onclick = () => {
+  // invented patients, same layout as the Epic team census
+  $("#raw").value = "VR Team Z (6) General Hospital.2 West Surgical Unit(2) PRUEBA, ANA 68Y Female LOS:7.5H Doctor uno, Pedro H MD VR2025000001 VR00000001 MANAGED MEDICARE DEHYDRATION,UTI VR.213.A Inpatient EJEMPLO, ROSA M 56Y Female LOS:23.0H Doctor uno, Pedro H MD VR2025000002 VR00000002 SELF PAY COMPLICATED UTI, 4MM STONE VR.218.B Inpatient General Hospital.PROGRESSIVE CARE UNIT(1) FICTICIO GOMEZ, LUIS L 69Y Male LOS:6D Doctor dos, Ana M MD VR2025000003 VR00000003 WORKERS COMPENSATION PTX,RIB FX VR.226.B Inpatient General Hospital.2 EAST CARDIAC UNIT(2) DEMO, JOSE 77Y Male LOS:4D Doctor uno, Pedro H MD VR2025000004 HA00000004 FEDERAL PROGRAMS RECTAL BLEEDING VR.259.01 Inpatient CASO, MARIA E 76Y Female LOS:2D Doctor uno, Pedro H MD Report created on 11/04/2026 11:09 PM Page 1 of 3 VR2025000005 VR00000005 MANAGED MEDICARE PLEURAL EFFUSION VR.260.A Inpatient General Hospital.3 CENTRAL STROKE(1) MODELO, JUAN E 37Y Male LOS:21.1H Doctor uno, Pedro H MD VR2025000006 MEDICARE VR.353.01 VR00000006 PANCYTOPENIA Inpatient Report created on 11/04/2026 11:09 PM Page 3 of 3";
+  $("#parse").click();
+};
+$("#auto").onclick = autoAssign;
+$("#copy").onclick = copyText;
+$("#print").onclick = printLists;
+$("#rounds").onclick = printRounds;
+$("#forget").onclick = () => {
+  hist.days = []; prevDay = null; storeHist(); showCont();
+  patients.forEach(p=>p.prev=""); render(); toast("Saved split forgotten");
+};
+$("#clear").onclick = () => {
+  if(!patients.length) return;
+  patients=[]; selectedId=null; for(const k in floorColorMap) delete floorColorMap[k];
+  render(); toast("List cleared");
+};
+$("#addRes").onclick = () => { residents.push({id:"r"+(uid++),name:"Resident "+(residents.length+1)}); savePrefs(); render(); };
+$("#cap").onchange = () => { savePrefs(); render(); };
+$("#layout").onchange = savePrefs;
+$("#initials").onchange = render;
+
+$("#board").addEventListener("input", e=>{
+  const id = e.target.dataset.rename; if(!id) return;
+  residents.find(r=>r.id===id).name = e.target.value; savePrefs();
+});
+$("#board").addEventListener("click", e=>{
+  const t = e.target;
+  if(t.dataset.me){
+    const r=residents.find(x=>x.id===t.dataset.me), was=r.isMe;
+    residents.forEach(x=>x.isMe=false); r.isMe=!was; savePrefs(); render();
+    if(r.isMe) loadMyBeds();
+    return;
+  }
+  if(t.hasAttribute("data-addmb")){ addToMyBeds(t); return; }
+  if(t.dataset.rtoggle){
+    const r=residents.find(x=>x.id===t.dataset.rtoggle); r.noRounds=!r.noRounds; savePrefs(); render();
+    toast(r.noRounds?`${r.name}: no rounds sheets`:`${r.name}: rounds sheets on`); return;
+  }
+  if(t.dataset.remove){
+    const id=t.dataset.remove; patients.forEach(p=>{ if(p.owner===id) p.owner=POOL; });
+    residents = residents.filter(r=>r.id!==id); savePrefs(); render(); return;
+  }
+  const card = t.closest(".card");
+  if(t.dataset.tag && card){ const p=patients.find(x=>x.id===card.dataset.id); p.tags[t.dataset.tag]=!p.tags[t.dataset.tag]; render(); return; }
+  if(t.hasAttribute("data-edit") && card){ openEdit(card.dataset.id); return; }
+  if(t.tagName==="INPUT") return;
+  // tap-to-select, then tap a column to move it there
+  if(card){ selectedId = selectedId===card.dataset.id ? null : card.dataset.id; render(); if(selectedId) toast("Now tap the destination column"); return; }
+  const col = t.closest("[data-drop]");
+  if(col && selectedId){ move(selectedId, col.dataset.drop); }
+});
+
+// pointer drag (mouse: whole card; touch: ⋮⋮ handle so scrolling still works)
+let drag=null;
+$("#board").addEventListener("pointerdown", e=>{
+  const card = e.target.closest(".card");
+  if(!card || e.target.closest("button")) return;
+  if(e.pointerType!=="mouse" && !e.target.closest(".handle")) return;
+  drag = {id:card.dataset.id, card, x:e.clientX, y:e.clientY, started:false, ghost:null, over:null, pid:e.pointerId};
+});
+window.addEventListener("pointermove", e=>{
+  if(!drag || e.pointerId!==drag.pid) return;
+  if(!drag.started){
+    if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<6) return;
+    drag.started=true;
+    const r=drag.card.getBoundingClientRect();
+    const g=drag.card.cloneNode(true); g.classList.add("ghostcard"); g.style.width=r.width+"px";
+    drag.dx=e.clientX-r.left; drag.dy=e.clientY-r.top;
+    document.body.appendChild(g); drag.ghost=g; drag.card.style.opacity=".35";
+  }
+  e.preventDefault();
+  drag.ghost.style.left=(e.clientX-drag.dx)+"px"; drag.ghost.style.top=(e.clientY-drag.dy)+"px";
+  const el=document.elementFromPoint(e.clientX,e.clientY);
+  const col=el && el.closest("[data-drop]");
+  if(drag.over && drag.over!==col) drag.over.classList.remove("over");
+  if(col){ col.classList.add("over"); drag.over=col; } else drag.over=null;
+},{passive:false});
+function endDrag(e){
+  if(!drag || (e && e.pointerId!==drag.pid)) return;
+  const d=drag; drag=null;
+  if(!d.started) return;
+  d.ghost.remove(); d.card.style.opacity="";
+  if(d.over){ d.over.classList.remove("over"); move(d.id,d.over.dataset.drop); }
+  // swallow the click that follows a drag
+  const stop=ev=>{ev.stopPropagation();ev.preventDefault();}; window.addEventListener("click",stop,{capture:true,once:true});
+  setTimeout(()=>window.removeEventListener("click",stop,{capture:true}),0);
+}
+window.addEventListener("pointerup", endDrag);
+window.addEventListener("pointercancel", endDrag);
+
+window.addEventListener("beforeunload", e=>{ if(patients.length){ e.preventDefault(); e.returnValue=""; } });
+
+loadPrefs(); loadHist(); render(); loadMyBeds();
+// Coming back from the My Beds tab re-reads it, so fixes made there show up here.
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") loadMyBeds(); });
+// expose for testing
+window.__split = {parseText, get patients(){return patients}, buildText, saveSplit, loadHist, autoAssign, get residents(){return residents}};
+})();
+</script>
+</body>
+</html>
